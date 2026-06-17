@@ -467,6 +467,27 @@
         font-family: "Microsoft YaHei", system-ui, sans-serif;
       }
 
+      .generation-status {
+        display: none;
+        margin: 0 0 16px;
+        border: 3px solid var(--line);
+        background: var(--yellow);
+        box-shadow: var(--shadow-sm);
+        padding: 10px 12px;
+        font-size: 14px;
+        font-weight: 950;
+        font-family: "Microsoft YaHei", system-ui, sans-serif;
+      }
+
+      .generation-status.show {
+        display: block;
+      }
+
+      .generation-status.error {
+        background: #ff616d;
+        color: #fff;
+      }
+
       .toast {
         position: fixed;
         left: 50%;
@@ -695,6 +716,7 @@
 
         <div class="panel output">
           <h3>生成结果</h3>
+                    <div id="generationStatus" class="generation-status" role="status" aria-live="polite">???????</div>
           <label>
             完整分镜版
             <textarea id="fullPrompt" readonly></textarea>
@@ -959,6 +981,7 @@
       const aiProgress = document.querySelector("#aiProgress");
       const aiProgressBar = document.querySelector("#aiProgressBar");
       const aiProgressText = document.querySelector("#aiProgressText");
+      const generationStatus = document.querySelector("#generationStatus");
       const hotCards = document.querySelector("#hotCards");
       const filterRow = document.querySelector("#filterRow");
       const toast = document.querySelector("#toast");
@@ -1282,6 +1305,7 @@
 
         const context = getContext();
         generatePrompts();
+        setGenerationStatus("", "idle");
         setAiGenerating(true);
         updateAiProgress(12, "整理表单信息...");
 
@@ -1314,9 +1338,11 @@
           fields.compactPrompt.value = result.compactPrompt || fields.compactPrompt.value;
           fields.paramAdvice.value = result.paramAdvice || fields.paramAdvice.value;
           updateAiProgress(100, "生成完成");
+          setGenerationStatus("提示词生成完成，可以复制或写入出视频。", "success");
           showToast("DeepSeek 提示词已生成");
         } catch (error) {
           updateAiProgress(100, "DeepSeek 失败，已保留本地模板结果");
+          setGenerationStatus(`提示词生成完成（本地模板）。DeepSeek：${error.message || "生成失败"}`, "error");
           showToast(error.message || "DeepSeek 生成失败，已使用本地模板");
         } finally {
           window.setTimeout(() => setAiGenerating(false), 900);
@@ -1342,6 +1368,12 @@
       function updateAiProgress(percent, message) {
         aiProgressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
         aiProgressText.textContent = message;
+      }
+
+      function setGenerationStatus(message, state = "success") {
+        generationStatus.textContent = message || "提示词生成完成";
+        generationStatus.classList.toggle("show", Boolean(message));
+        generationStatus.classList.toggle("error", state === "error");
       }
 
       async function api(url, options = {}) {
