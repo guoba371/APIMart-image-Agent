@@ -47,6 +47,9 @@ export function createConfig(env = {}) {
     apiUrl: String(env.APIMART_API_URL || "https://api.apimart.ai").replace(/\/+$/, ""),
     model: String(env.APIMART_MODEL || "gpt-image-2").trim(),
     videoModel: String(env.APIMART_VIDEO_MODEL || "doubao-seedance-2.0").trim(),
+    deepseekApiKey: String(env.DEEPSEEK_API_KEY || "").trim(),
+    deepseekApiUrl: String(env.DEEPSEEK_API_URL || "https://api.deepseek.com").replace(/\/+$/, ""),
+    deepseekModel: String(env.DEEPSEEK_MODEL || "deepseek-v4-flash").trim(),
     port: Number(env.PORT || 8787),
   };
 }
@@ -63,43 +66,50 @@ export async function handleRequest(request, env = {}, options = {}) {
         videoModel: config.videoModel,
         videoModels,
         videoModelCapabilities,
+        hasDeepSeekApiKey: Boolean(config.deepseekApiKey),
+        deepseekModel: config.deepseekModel,
         hasApiKey: Boolean(config.apiKey),
       });
     }
 
     if (request.method === "GET" && url.pathname === "/api/account/token-balance") {
-      return handleBalance(request, config, "/v1/balance");
+      return await handleBalance(request, config, "/v1/balance");
     }
 
     if (request.method === "GET" && url.pathname === "/api/account/user-balance") {
-      return handleBalance(request, config, "/v1/user/balance");
+      return await handleBalance(request, config, "/v1/user/balance");
     }
 
     if (request.method === "GET" && url.pathname === "/api/account/project-balance") {
-      return handleProjectBalance(config);
+      return await handleProjectBalance(config);
     }
 
     if (request.method === "POST" && url.pathname === "/api/generate") {
       const body = await readJsonRequest(request);
-      return handleGenerate(request, config, body);
+      return await handleGenerate(request, config, body);
     }
 
     if (request.method === "POST" && url.pathname === "/api/videos/generate") {
       const body = await readJsonRequest(request);
-      return handleVideoGenerate(request, config, body);
+      return await handleVideoGenerate(request, config, body);
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/prompts/generate") {
+      const body = await readJsonRequest(request);
+      return await handlePromptGenerate(config, body);
     }
 
     if (request.method === "POST" && url.pathname === "/api/uploads/images") {
-      return handleImageUpload(request, config);
+      return await handleImageUpload(request, config);
     }
 
     if (request.method === "GET" && url.pathname.startsWith("/api/tasks/")) {
       const taskId = decodeURIComponent(url.pathname.replace("/api/tasks/", ""));
-      return handleTaskStatus(request, config, taskId);
+      return await handleTaskStatus(request, config, taskId);
     }
 
     if (request.method === "GET" && options.serveStatic) {
-      return options.serveStatic(request);
+      return await options.serveStatic(request);
     }
 
     return jsonResponse(405, { error: "Method not allowed" });
@@ -363,6 +373,49 @@ async function handleTaskStatus(request, config, taskId) {
   });
 }
 
+async function handlePromptGenerate(config, body) {
+  if (!config.deepseekApiKey) {
+    return jsonResponse(400, { error: "DeepSeek API key is not configured. Please set DEEPSEEK_API_KEY on the server." });
+  }
+
+  const context = normalizePromptContext(body);
+  if (!context.product && !context.idea) {
+    return jsonResponse(400, { error: "Product, service name, or idea is required." });
+  }
+
+  const data = await callDeepSeek(config, {
+    model: config.deepseekModel,
+    messages: [
+      {
+        role: "system",
+        content: [
+          "你是 Seedance 2.0 / Wan 2.5 营销视频提示词专家。",
+          "只输出严格 JSON，不要 Markdown，不要代码块。",
+          "JSON 字段必须是 fullPrompt、compactPrompt、paramAdvice。",
+          "提示词要适合中文营销广告、招商宣传、信息流短视频。",
+          "必须包含主体、场景、运动、镜头、美学、风格、音频、限制。",
+          "不要生成真实可识别真人脸、平台侵权 UI、二维码、联系方式、水印或杂乱小字。",
+        ].join("\n"),
+      },
+      {
+        role: "user",
+        content: buildDeepSeekPromptRequest(context),
+      },
+    ],
+    temperature: 0.7,
+    response_format: { type: "json_object" },
+  });
+
+  const content = data?.choices?.[0]?.message?.content || "";
+  const generated = parsePromptAgentJson(content);
+  return jsonResponse(200, {
+    fullPrompt: generated.fullPrompt,
+    compactPrompt: generated.compactPrompt,
+    paramAdvice: generated.paramAdvice,
+    model: config.deepseekModel,
+  });
+}
+
 async function handleBalance(request, config, path) {
   const apiKey = getRequestApiKey(request, config);
   if (!apiKey) {
@@ -428,6 +481,118 @@ async function callApimart(path, apiKey, config, options = {}) {
   }
 
   return data;
+}
+
+async function callDeepSeek(config, payload) {
+  let response;
+  try {
+    response = await fetch(`${config.deepseekApiUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.deepseekApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    const wrapped = new Error(`DeepSeek network request failed: ${error.message || error}`);
+    wrapped.statusCode = 502;
+    wrapped.userMessage = `DeepSeek 网络请求失败：${error.message || error}`;
+    wrapped.code = error.code || error.cause?.code || null;
+    throw wrapped;
+  }
+
+  const text = await response.text();
+  const data = parseJsonOrThrow(text, `DeepSeek returned non-JSON response (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || data?.message || `DeepSeek request failed (${response.status})`);
+    error.statusCode = response.status;
+    error.userMessage = error.message;
+    error.raw = data;
+    throw error;
+  }
+
+  return data;
+}
+
+function normalizePromptContext(body = {}) {
+  return {
+    idea: String(body.idea || "").trim(),
+    product: String(body.product || "").trim(),
+    audience: String(body.audience || "").trim(),
+    goal: String(body.goal || "").trim(),
+    duration: clampInt(body.duration, 5, 15, 8),
+    size: String(body.size || "9:16").trim(),
+    model: String(body.model || "doubao-seedance-2.0").trim(),
+    style: String(body.style || "viral").trim(),
+    rhythm: String(body.rhythm || "beat").trim(),
+    audio: String(body.audio || "voice").trim(),
+    voice: String(body.voice || "沉稳有力的中文男声").trim(),
+    benefits: normalizeStringArray(body.benefits).slice(0, 5),
+    offer: String(body.offer || "").trim(),
+    cta: String(body.cta || "").trim(),
+    restrictions: normalizeStringArray(body.restrictions),
+  };
+}
+
+function buildDeepSeekPromptRequest(context) {
+  return [
+    "请基于以下结构化信息，生成 Seedance 2.0 / Wan 2.5 视频提示词。",
+    "返回 JSON：",
+    "{",
+    '  "fullPrompt": "完整分镜版，按时间轴输出 0-2s、2-4s 等结构",',
+    '  "compactPrompt": "压缩投喂版，适合模型不稳定时使用",',
+    '  "paramAdvice": "参数建议，包含 model、duration、size、generate_audio、参考素材建议"',
+    "}",
+    "",
+    `用户自由需求：${context.idea || "无"}`,
+    `产品/服务：${context.product || context.idea}`,
+    `目标用户：${context.audience || "未指定，请合理推断"}`,
+    `视频目标：${context.goal || "营销转化"}`,
+    `时长：${context.duration}s`,
+    `比例：${context.size}`,
+    `视频模型：${context.model}`,
+    `风格：${context.style}`,
+    `节奏：${context.rhythm}`,
+    `音频：${context.audio}`,
+    `旁白：${context.voice}`,
+    `卖点：${context.benefits.join("；") || "请根据产品合理提炼 3 条"}`,
+    `优惠/利益点：${context.offer || "请根据场景合理生成"}`,
+    `CTA：${context.cta || "请给出清晰行动号召"}`,
+    `限制词：${context.restrictions.join("；") || "核心文字清晰可读，不要杂乱小字，不要平台侵权 UI，不要真实可识别真人脸"}`,
+    "",
+    "要求：",
+    "1. fullPrompt 必须是中文，适合直接粘贴到视频生成模型。",
+    "2. 按时长自动切分 4 段左右分镜，每段包含画面、核心大字、运动/转场、旁白或音频节奏。",
+    "3. compactPrompt 不超过 fullPrompt 的 45%，但保留关键信息。",
+    "4. paramAdvice 要明确 generate_audio true/false；如果 audio 是 silent 或 voice 是不需要旁白，则建议 false。",
+    "5. 不要复刻任何第三方平台 UI，不要输出多余解释。",
+  ].join("\n");
+}
+
+function parsePromptAgentJson(content) {
+  try {
+    const parsed = JSON.parse(stripJsonFence(content));
+    return {
+      fullPrompt: String(parsed.fullPrompt || "").trim(),
+      compactPrompt: String(parsed.compactPrompt || "").trim(),
+      paramAdvice: String(parsed.paramAdvice || "").trim(),
+    };
+  } catch (error) {
+    const wrapped = new Error("DeepSeek returned invalid prompt JSON.");
+    wrapped.statusCode = 502;
+    wrapped.userMessage = "DeepSeek 返回的提示词 JSON 无法解析，请重试。";
+    wrapped.raw = content;
+    throw wrapped;
+  }
+}
+
+function stripJsonFence(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
 }
 
 function parseJsonOrThrow(text, prefix) {

@@ -433,6 +433,40 @@
         margin-top: 16px;
       }
 
+      .ai-progress {
+        display: none;
+        margin-top: 16px;
+        border: 3px solid var(--line);
+        background: #fff;
+        box-shadow: var(--shadow-sm);
+        padding: 10px;
+      }
+
+      .ai-progress.show {
+        display: block;
+      }
+
+      .ai-progress-track {
+        height: 16px;
+        border: 2px solid var(--line);
+        background: #f7f7f7;
+        overflow: hidden;
+      }
+
+      .ai-progress-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--yellow), var(--cyan));
+        transition: width 0.22s ease;
+      }
+
+      .ai-progress-text {
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 950;
+        font-family: "Microsoft YaHei", system-ui, sans-serif;
+      }
+
       .toast {
         position: fixed;
         left: 50%;
@@ -652,6 +686,10 @@
           <div class="action-row">
             <button id="generateButton" class="primary" type="button">生成提示词</button>
             <button id="resetButton" type="button">清空</button>
+          </div>
+          <div id="aiProgress" class="ai-progress" aria-live="polite">
+            <div class="ai-progress-track"><div id="aiProgressBar" class="ai-progress-bar"></div></div>
+            <div id="aiProgressText" class="ai-progress-text">准备生成...</div>
           </div>
         </form>
 
@@ -916,9 +954,15 @@
         paramAdvice: document.querySelector("#paramAdvice"),
       };
 
+      const generateButton = document.querySelector("#generateButton");
+      const quickGenerateButton = document.querySelector("#quickGenerateButton");
+      const aiProgress = document.querySelector("#aiProgress");
+      const aiProgressBar = document.querySelector("#aiProgressBar");
+      const aiProgressText = document.querySelector("#aiProgressText");
       const hotCards = document.querySelector("#hotCards");
       const filterRow = document.querySelector("#filterRow");
       const toast = document.querySelector("#toast");
+      let aiProgressTimer = null;
       let activeCategory = "全部";
       let activePreset = promptLibrary[0];
 
@@ -930,8 +974,8 @@
         applyPreset(promptLibrary[0], { silent: true });
         generatePrompts();
 
-        document.querySelector("#quickGenerateButton").addEventListener("click", generateFromQuickIdea);
-        document.querySelector("#generateButton").addEventListener("click", generatePrompts);
+        quickGenerateButton.addEventListener("click", generateFromQuickIdea);
+        generateButton.addEventListener("click", generatePromptsWithDeepSeek);
         document.querySelector("#resetButton").addEventListener("click", resetForm);
         document.querySelector("#copyFullButton").addEventListener("click", () => copyText(fields.fullPrompt.value, "完整提示词已复制"));
         document.querySelector("#copyCompactButton").addEventListener("click", () => copyText(fields.compactPrompt.value, "压缩版提示词已复制"));
@@ -1165,7 +1209,7 @@
         fields.rhythm.value = /稳重|商务/.test(idea) ? "business" : /口播/.test(idea) ? "talking" : /快剪/.test(idea) ? "fast" : "beat";
         fields.style.value = /科技|数据/.test(idea) ? "tech" : /电影/.test(idea) ? "cinematic" : /产品/.test(idea) ? "product" : "viral";
         if (/优惠|折扣|特惠|%/.test(idea)) fields.offer.value = idea.match(/[^，。；;]*(优惠|折扣|特惠|%)[^，。；;]*/)?.[0] || fields.offer.value;
-        generatePrompts();
+        generatePromptsWithDeepSeek();
         document.querySelector("#agentForm").scrollIntoView({ behavior: "smooth", block: "start" });
         showToast("已根据需求生成结构化提示词");
       }
@@ -1231,6 +1275,86 @@
           `generate_audio: ${context.audio === "silent" || context.voice === "不需要旁白" ? "false" : "true"}`,
           "参考素材建议：可使用品牌主视觉、产品图、抽象数据流参考图；参考视频需公网可访问，避免清晰真人脸、平台UI、二维码和水印。",
         ].join("\n");
+      }
+
+      async function generatePromptsWithDeepSeek() {
+        if (generateButton.disabled) return;
+
+        const context = getContext();
+        generatePrompts();
+        setAiGenerating(true);
+        updateAiProgress(12, "整理表单信息...");
+
+        try {
+          updateAiProgress(36, "连接 DeepSeek 生成提示词...");
+          const result = await api("/api/prompts/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              idea: fields.quickIdea.value.trim(),
+              product: context.product,
+              audience: context.audience,
+              goal: context.goal,
+              duration: context.duration,
+              size: context.size,
+              model: context.model,
+              style: context.style,
+              rhythm: context.rhythm,
+              audio: context.audio,
+              voice: context.voice,
+              benefits: context.benefits,
+              offer: context.offer,
+              cta: context.cta,
+              restrictions: context.restrictions,
+            }),
+          });
+
+          updateAiProgress(82, "解析 DeepSeek 返回结果...");
+          fields.fullPrompt.value = result.fullPrompt || fields.fullPrompt.value;
+          fields.compactPrompt.value = result.compactPrompt || fields.compactPrompt.value;
+          fields.paramAdvice.value = result.paramAdvice || fields.paramAdvice.value;
+          updateAiProgress(100, "生成完成");
+          showToast("DeepSeek 提示词已生成");
+        } catch (error) {
+          updateAiProgress(100, "DeepSeek 失败，已保留本地模板结果");
+          showToast(error.message || "DeepSeek 生成失败，已使用本地模板");
+        } finally {
+          window.setTimeout(() => setAiGenerating(false), 900);
+        }
+      }
+
+      function setAiGenerating(isGenerating) {
+        generateButton.disabled = isGenerating;
+        quickGenerateButton.disabled = isGenerating;
+        aiProgress.classList.toggle("show", isGenerating);
+        if (isGenerating) {
+          updateAiProgress(5, "准备生成...");
+          clearInterval(aiProgressTimer);
+          aiProgressTimer = setInterval(() => {
+            const current = Number.parseFloat(aiProgressBar.style.width) || 5;
+            if (current < 78) updateAiProgress(current + 4, "DeepSeek 正在生成中...");
+          }, 450);
+        } else {
+          clearInterval(aiProgressTimer);
+        }
+      }
+
+      function updateAiProgress(percent, message) {
+        aiProgressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        aiProgressText.textContent = message;
+      }
+
+      async function api(url, options = {}) {
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          throw new Error(`接口返回非 JSON：${text.slice(0, 120)}`);
+        }
+        if (!response.ok) throw new Error(data.error || "请求失败");
+        return data;
       }
 
       function getContext() {
