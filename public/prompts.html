@@ -1,0 +1,1336 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Seedance 2.0 提示词工具</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #050505;
+        --paper: #fffdf6;
+        --soft: #f5f1e7;
+        --line: #050505;
+        --muted: #5d5d55;
+        --pink: #ff616d;
+        --yellow: #ffe04f;
+        --cyan: #52d1d1;
+        --green: #83d783;
+        --purple: #b9a7ff;
+        --orange: #ff914d;
+        --shadow: 6px 6px 0 #050505;
+        --shadow-sm: 4px 4px 0 #050505;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: "Arial Black", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+        background: var(--paper);
+        letter-spacing: 0;
+      }
+
+      button,
+      textarea,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button,
+      a.button {
+        min-height: 42px;
+        border: 3px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        box-shadow: var(--shadow-sm);
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 0 18px;
+        font-weight: 950;
+      }
+
+      button:hover,
+      a.button:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: 6px 6px 0 #050505;
+      }
+
+      button.primary {
+        background: #050505;
+        color: #fff;
+      }
+
+      button.yellow {
+        background: var(--yellow);
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px clamp(14px, 3vw, 36px);
+        border-bottom: 4px solid var(--line);
+        background: rgba(255, 253, 246, 0.88);
+        backdrop-filter: blur(12px);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 3px solid var(--line);
+        background: #fff;
+        padding: 8px 14px;
+        box-shadow: var(--shadow-sm);
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .brand-mark {
+        width: 28px;
+        height: 18px;
+        border: 4px solid var(--line);
+        border-left-width: 10px;
+        border-radius: 14px 14px 4px 4px;
+      }
+
+      .nav-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .hero {
+        min-height: 620px;
+        padding: 64px clamp(18px, 4vw, 64px) 52px;
+        background:
+          radial-gradient(circle at 16% 22%, rgba(255, 145, 77, 0.78), transparent 26%),
+          radial-gradient(circle at 28% 70%, rgba(255, 224, 79, 0.9), transparent 28%),
+          radial-gradient(circle at 66% 40%, rgba(82, 209, 209, 0.78), transparent 34%),
+          linear-gradient(120deg, #ff8759 0%, #ffe04f 30%, #62d3bf 62%, #b9a7ff 100%);
+        border-bottom: 5px solid var(--line);
+        text-align: center;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(54px, 9vw, 132px);
+        line-height: 0.86;
+        font-weight: 1000;
+        color: #fff;
+        text-shadow: 8px 8px 0 #050505;
+      }
+
+      .hero-label {
+        width: fit-content;
+        margin: 26px auto 12px;
+        padding: 10px 32px;
+        border: 4px solid var(--line);
+        background: #fff;
+        box-shadow: var(--shadow);
+        font-size: clamp(34px, 5vw, 68px);
+        line-height: 1;
+        font-weight: 1000;
+      }
+
+      .hero p {
+        margin: 22px auto 34px;
+        max-width: 760px;
+        color: #fff;
+        text-shadow: 2px 2px 0 #050505;
+        font-size: 18px;
+        line-height: 1.7;
+        font-family: "Microsoft YaHei", system-ui, sans-serif;
+        font-weight: 800;
+      }
+
+      .generator {
+        width: min(860px, 100%);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 132px;
+        gap: 10px;
+        border: 4px solid var(--line);
+        background: #fff;
+        box-shadow: var(--shadow);
+        padding: 10px;
+        text-align: left;
+      }
+
+      .generator textarea {
+        width: 100%;
+        min-height: 136px;
+        resize: vertical;
+        border: 2px solid var(--line);
+        background: #f7f7f7;
+        color: var(--ink);
+        padding: 18px;
+        outline: none;
+        font-family: "Microsoft YaHei", system-ui, sans-serif;
+        font-weight: 700;
+        line-height: 1.6;
+      }
+
+      .generator-side {
+        display: grid;
+        gap: 10px;
+      }
+
+      .generator-side button {
+        width: 100%;
+        min-height: 100%;
+        flex-direction: column;
+      }
+
+      .generator-tools {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+
+      .generator-tools button {
+        min-height: 38px;
+        box-shadow: none;
+        border-width: 2px;
+        font-size: 13px;
+      }
+
+      .section {
+        padding: 42px clamp(18px, 4vw, 64px);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 28px;
+        border-bottom: 4px solid var(--line);
+        padding-bottom: 14px;
+      }
+
+      .section h2 {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 46px);
+        line-height: 1;
+        font-weight: 1000;
+      }
+
+      .filter-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+      }
+
+      .filter-row button {
+        min-height: 36px;
+        border-width: 2px;
+        box-shadow: none;
+        font-size: 13px;
+      }
+
+      .filter-row button.active {
+        background: #050505;
+        color: #fff;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 34px;
+      }
+
+      .prompt-card {
+        border: 3px solid var(--line);
+        background: #fff;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        display: grid;
+        min-height: 520px;
+      }
+
+      .thumb {
+        height: 210px;
+        border-bottom: 3px solid var(--line);
+        position: relative;
+        overflow: hidden;
+        background:
+          linear-gradient(135deg, var(--card-color, #ff616d), #050505);
+      }
+
+      .thumb::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.46) 100%),
+          radial-gradient(circle at 20% 18%, rgba(255,255,255,0.22), transparent 30%);
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .thumb-art {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .thumb-frame {
+        position: absolute;
+        inset: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.72);
+        z-index: 3;
+        pointer-events: none;
+      }
+
+      .thumb-title {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        z-index: 4;
+        color: #fff;
+        font-size: 30px;
+        line-height: 1.03;
+        text-shadow: 4px 4px 0 #050505;
+        font-weight: 1000;
+      }
+
+      .card-body {
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .meta-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid #d9d5ca;
+        padding-bottom: 10px;
+        font-size: 13px;
+      }
+
+      .meta-line strong {
+        font-size: 14px;
+      }
+
+      .preview-box {
+        border: 2px solid var(--line);
+        background: #f7f7f7;
+        min-height: 86px;
+        padding: 12px;
+        font-family: "Microsoft YaHei", system-ui, sans-serif;
+        font-size: 13px;
+        line-height: 1.55;
+        font-weight: 650;
+        color: #222;
+      }
+
+      .card-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 48px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .card-actions button {
+        width: 100%;
+      }
+
+      .share {
+        padding: 0;
+        font-size: 20px;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+        gap: 28px;
+        align-items: start;
+      }
+
+      .panel {
+        border: 3px solid var(--line);
+        background: #fff;
+        box-shadow: var(--shadow);
+        padding: 22px;
+      }
+
+      .panel h3 {
+        margin: 0 0 16px;
+        font-size: 24px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 950;
+      }
+
+      label.wide {
+        grid-column: 1 / -1;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 2px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 9px 11px;
+        outline: none;
+        font-family: "Microsoft YaHei", system-ui, sans-serif;
+        font-weight: 700;
+      }
+
+      textarea {
+        min-height: 98px;
+        resize: vertical;
+        line-height: 1.55;
+      }
+
+      .output textarea {
+        min-height: 236px;
+      }
+
+      .output textarea.small {
+        min-height: 128px;
+      }
+
+      .action-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        border: 3px solid var(--line);
+        background: var(--yellow);
+        box-shadow: var(--shadow-sm);
+        padding: 12px 18px;
+        font-weight: 950;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, bottom 0.2s ease;
+        z-index: 20;
+      }
+
+      .toast.show {
+        opacity: 1;
+        bottom: 32px;
+      }
+
+      @media (max-width: 980px) {
+        .cards,
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .generator {
+          grid-template-columns: 1fr;
+        }
+
+        .generator-side button {
+          min-height: 68px;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .topbar,
+        .section-head {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .hero {
+          min-height: auto;
+          padding-top: 42px;
+        }
+
+        .hero h1 {
+          font-size: 58px;
+          text-shadow: 5px 5px 0 #050505;
+        }
+
+        .hero-label {
+          font-size: 40px;
+          padding-inline: 22px;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        APIMart Agent
+      </a>
+      <div class="nav-actions">
+        <a class="button" href="/">出图/出视频</a>
+        <button id="copyPageButton" type="button">复制当前提示词</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h1>SEEDANCE 2.0</h1>
+      <div class="hero-label">提示词</div>
+      <p>原创营销视频提示词库，每日可扩展。输入一个产品或需求，生成适合 Seedance 2.0 / Wan 2.5 的分镜、节奏、音频和限制词。</p>
+      <div class="generator">
+        <div>
+          <textarea id="quickIdea" placeholder="描述你想生成的视频...（例如：给 GEO AI搜索优化招商做一条 8 秒竖屏爆款广告）">GEO AI搜索优化招商，8秒竖屏，红黄高对比，强卡点，突出首月合作特惠最高50%优惠</textarea>
+          <div class="generator-tools">
+            <button type="button" data-quick="GEO AI搜索优化招商，8秒竖屏，红黄高对比，强卡点，代理合作优惠">GEO招商</button>
+            <button type="button" data-quick="本地生活门店引流，10秒竖屏，突出到店转化和同城曝光">门店引流</button>
+            <button type="button" data-quick="SaaS工具获客，15秒横屏，展示效率提升和预约演示">SaaS获客</button>
+            <button type="button" data-quick="电商产品卖点视频，8秒方形，展示痛点对比和限时优惠">电商卖点</button>
+          </div>
+        </div>
+        <div class="generator-side">
+          <button id="quickGenerateButton" class="primary" type="button">✦<br />生成</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>热门提示词</h2>
+        <button id="showAllButton" type="button">查看全部 →</button>
+      </div>
+      <div id="filterRow" class="filter-row" aria-label="提示词分类"></div>
+      <div id="hotCards" class="cards"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>提示词工作台</h2>
+        <a class="button" href="/">回到出视频 →</a>
+      </div>
+      <div class="workspace">
+        <form id="agentForm" class="panel">
+          <h3>结构化生成</h3>
+          <div class="form-grid">
+            <label>
+              产品/服务名称
+              <input id="product" value="GEO AI搜索优化代理" />
+            </label>
+            <label>
+              目标用户
+              <input id="audience" value="企业老板、营销从业者、个人创业者" />
+            </label>
+            <label>
+              视频目标
+              <select id="goal">
+                <option selected>招商</option>
+                <option>获客</option>
+                <option>品牌曝光</option>
+                <option>转化下单</option>
+              </select>
+            </label>
+            <label>
+              时长
+              <select id="duration">
+                <option value="5">5s</option>
+                <option value="8" selected>8s</option>
+                <option value="10">10s</option>
+                <option value="15">15s</option>
+              </select>
+            </label>
+            <label>
+              比例
+              <select id="size">
+                <option selected>9:16</option>
+                <option>16:9</option>
+                <option>1:1</option>
+                <option>21:9</option>
+                <option>adaptive</option>
+              </select>
+            </label>
+            <label>
+              模型
+              <select id="model">
+                <option value="doubao-seedance-2.0" selected>Seedance 2.0</option>
+                <option value="wan2.5">Wan 2.5</option>
+              </select>
+            </label>
+            <label>
+              风格
+              <select id="style">
+                <option value="viral" selected>红黄高对比爆款</option>
+                <option value="tech">科技数据流</option>
+                <option value="ugc">UGC口播</option>
+                <option value="product">产品展示</option>
+                <option value="cinematic">电影感商业片</option>
+              </select>
+            </label>
+            <label>
+              节奏
+              <select id="rhythm">
+                <option value="beat" selected>强卡点</option>
+                <option value="fast">快剪</option>
+                <option value="business">稳重商务</option>
+                <option value="talking">口播带货</option>
+              </select>
+            </label>
+            <label>
+              音频
+              <select id="audio">
+                <option value="voice" selected>有声旁白</option>
+                <option value="bgm">BGM 氛围</option>
+                <option value="drum">鼓点卡点</option>
+                <option value="silent">无声</option>
+              </select>
+            </label>
+            <label>
+              旁白
+              <select id="voice">
+                <option selected>沉稳有力的中文男声</option>
+                <option>清晰利落的中文女声</option>
+                <option>快节奏信息流口播</option>
+                <option>不需要旁白</option>
+              </select>
+            </label>
+            <label class="wide">
+              卖点（每行 1 条）
+              <textarea id="benefits">关键词全AI优化
+企业品牌快速收录
+优质词/竞争词优化</textarea>
+            </label>
+            <label>
+              优惠/利益点
+              <input id="offer" value="首月合作特惠，最高50%优惠" />
+            </label>
+            <label>
+              CTA 行动号召
+              <input id="cta" value="招募代理 / 个人合作中" />
+            </label>
+            <label class="wide">
+              限制词
+              <textarea id="restrictions">不要出现真实可识别真人脸
+不要出现具体平台UI侵权画面
+核心文字必须清晰可读，不要杂乱小字
+不要出现二维码、联系方式、水印或品牌Logo</textarea>
+            </label>
+          </div>
+          <div class="action-row">
+            <button id="generateButton" class="primary" type="button">生成提示词</button>
+            <button id="resetButton" type="button">清空</button>
+          </div>
+        </form>
+
+        <div class="panel output">
+          <h3>生成结果</h3>
+          <label>
+            完整分镜版
+            <textarea id="fullPrompt" readonly></textarea>
+          </label>
+          <div class="action-row">
+            <button id="copyFullButton" class="yellow" type="button">复制完整提示词</button>
+            <button id="writeVideoButton" class="primary" type="button">写入出视频</button>
+          </div>
+          <label style="margin-top: 18px">
+            压缩投喂版
+            <textarea id="compactPrompt" class="small" readonly></textarea>
+          </label>
+          <div class="action-row">
+            <button id="copyCompactButton" type="button">复制压缩版</button>
+          </div>
+          <label style="margin-top: 18px">
+            参数建议
+            <textarea id="paramAdvice" class="small" readonly></textarea>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      const promptLibrary = [
+        {
+          id: "geo",
+          category: "招商广告",
+          title: "GEO AI搜索招商",
+          author: "@APIMART",
+          color: "#ff616d",
+          product: "GEO AI搜索优化代理",
+          audience: "企业老板、营销从业者、个人创业者",
+          goal: "招商",
+          duration: 8,
+          size: "9:16",
+          style: "viral",
+          rhythm: "beat",
+          audio: "drum",
+          voice: "沉稳有力的中文男声",
+          benefits: ["关键词全AI优化", "企业品牌快速收录", "优质词/竞争词优化"],
+          offer: "首月合作特惠，最高50%优惠",
+          cta: "招募代理 / 个人合作中",
+          scenes: ["AI搜索流量爆发，关键词数据流和问答卡片快速闪过", "品牌信息被AI回答引用，搜索结果高亮上升", "合作政策和优惠数字爆破式出现", "GEO主视觉冲出数据流，招商CTA定格"],
+        },
+        {
+          id: "local",
+          category: "本地生活",
+          title: "门店同城引流",
+          author: "@APIMART",
+          color: "#83d783",
+          product: "本地生活门店引流方案",
+          audience: "餐饮店、美业店、同城服务老板",
+          goal: "获客",
+          duration: 10,
+          size: "9:16",
+          style: "ugc",
+          rhythm: "talking",
+          audio: "voice",
+          voice: "快节奏信息流口播",
+          benefits: ["同城曝光提升", "到店转化路径清晰", "口碑内容持续放大"],
+          offer: "先做门店诊断，再按效果放量",
+          cta: "预约门店诊断",
+          scenes: ["门店招牌和同城热搜词快速闪过", "服务亮点和顾客到店动线卡点呈现", "优惠套餐和到店理由集中出现", "门店品牌定格，CTA清晰出现"],
+        },
+        {
+          id: "saas",
+          category: "SaaS增长",
+          title: "SaaS 获客演示",
+          author: "@APIMART",
+          color: "#52d1d1",
+          product: "SaaS增长工具",
+          audience: "中小企业老板、运营负责人、销售团队",
+          goal: "获客",
+          duration: 15,
+          size: "16:9",
+          style: "tech",
+          rhythm: "business",
+          audio: "bgm",
+          voice: "清晰利落的中文女声",
+          benefits: ["自动化线索管理", "数据看板实时追踪", "销售流程提效"],
+          offer: "免费体验核心功能",
+          cta: "立即预约演示",
+          scenes: ["混乱线索和表格堆叠，切到清晰仪表盘", "自动分配、跟进提醒、转化漏斗逐层点亮", "效率提升数字和团队协作画面出现", "产品抽象界面和预约演示CTA收尾"],
+        },
+        {
+          id: "ecommerce",
+          category: "电商转化",
+          title: "产品卖点爆发",
+          author: "@APIMART",
+          color: "#ffe04f",
+          product: "高转化电商产品",
+          audience: "追求性价比和效率的线上消费者",
+          goal: "转化下单",
+          duration: 8,
+          size: "1:1",
+          style: "product",
+          rhythm: "fast",
+          audio: "voice",
+          voice: "快节奏信息流口播",
+          benefits: ["核心卖点一眼看懂", "使用场景真实清晰", "限时优惠刺激下单"],
+          offer: "限时到手价，赠品加码",
+          cta: "现在下单",
+          scenes: ["产品从干净背景中推近，卖点大字压入", "使用前后对比和细节特写切换", "价格利益、赠品和库存紧迫感出现", "产品主视觉定格，购买CTA收尾"],
+        },
+        {
+          id: "course",
+          category: "课程资料",
+          title: "资料包引流",
+          author: "@APIMART",
+          color: "#b9a7ff",
+          product: "AI编程提示词卡片包",
+          audience: "AI编程新手、独立创作者、Vibe Coder",
+          goal: "获客",
+          duration: 10,
+          size: "9:16",
+          style: "viral",
+          rhythm: "fast",
+          audio: "voice",
+          voice: "清晰利落的中文女声",
+          benefits: ["复制即用", "覆盖高频开发场景", "减少反复试错"],
+          offer: "早期整理版限时开放",
+          cta: "获取资料包",
+          scenes: ["新手面对空白项目和报错信息，焦虑感快速出现", "提示词卡片、任务拆解和验证清单依次展开", "从需求到页面、修bug、跑验证的流程串联", "资料包封面和获取入口定格"],
+        },
+        {
+          id: "brand",
+          category: "品牌曝光",
+          title: "企业品牌增长",
+          author: "@APIMART",
+          color: "#ff914d",
+          product: "企业品牌增长方案",
+          audience: "成长型企业、品牌负责人、营销团队",
+          goal: "品牌曝光",
+          duration: 15,
+          size: "21:9",
+          style: "cinematic",
+          rhythm: "business",
+          audio: "bgm",
+          voice: "沉稳有力的中文男声",
+          benefits: ["统一品牌表达", "提升搜索可见度", "沉淀长期内容资产"],
+          offer: "品牌诊断方案开放申请",
+          cta: "申请品牌诊断",
+          scenes: ["品牌资产、搜索结果、内容矩阵从碎片状态聚合", "品牌关键词、案例背书和客户信任标签点亮", "曝光、询盘、转化的增长路径形成图谱", "品牌主张和行动号召高级感定格"],
+        },
+        {
+          id: "travel",
+          category: "旅行Vlog",
+          title: "目的地种草",
+          author: "@APIMART",
+          color: "#52d1d1",
+          product: "小众旅行目的地",
+          audience: "周末旅行、亲子出游、情侣度假用户",
+          goal: "品牌曝光",
+          duration: 15,
+          size: "9:16",
+          style: "cinematic",
+          rhythm: "fast",
+          audio: "bgm",
+          voice: "清晰利落的中文女声",
+          benefits: ["路线清晰", "景点氛围强", "出行理由具体"],
+          offer: "周末两天一晚轻攻略",
+          cta: "收藏这条路线",
+          scenes: ["清晨抵达、路牌、地图路线快速展开", "核心景点、餐食、住宿氛围切换", "预算、交通、时间安排简洁出现", "目的地夕阳定格，收藏CTA出现"],
+        },
+        {
+          id: "story",
+          category: "剧情短片",
+          title: "痛点反转剧情",
+          author: "@APIMART",
+          color: "#ff616d",
+          product: "效率提升服务",
+          audience: "被重复工作困住的职场人",
+          goal: "转化下单",
+          duration: 15,
+          size: "9:16",
+          style: "ugc",
+          rhythm: "talking",
+          audio: "voice",
+          voice: "快节奏信息流口播",
+          benefits: ["立刻减少重复动作", "流程自动化", "结果可追踪"],
+          offer: "免费做一次流程评估",
+          cta: "领取评估名额",
+          scenes: ["主角被表格和消息淹没，不出现清晰真人脸", "一句反问引出解决方案，界面抽象动效出现", "重复流程被自动化替代，时间数字下降", "轻松收尾，CTA明确"],
+        },
+        {
+          id: "tech",
+          category: "科技数据流",
+          title: "AI能力发布",
+          author: "@APIMART",
+          color: "#83d783",
+          product: "AI自动化能力",
+          audience: "企业决策者、产品经理、技术负责人",
+          goal: "品牌曝光",
+          duration: 8,
+          size: "16:9",
+          style: "tech",
+          rhythm: "beat",
+          audio: "drum",
+          voice: "沉稳有力的中文男声",
+          benefits: ["自动理解任务", "多步骤执行", "结果可验证"],
+          offer: "开放内测申请",
+          cta: "申请体验",
+          scenes: ["数据粒子汇聚成AI核心能力标题", "任务链路、工具调用、结果验证依次亮起", "效率提升数字和应用场景爆点出现", "品牌主视觉和内测CTA收尾"],
+        },
+      ];
+
+      const styleMap = {
+        viral: "红白黄高对比，粗体中文大字，信息流爆款广告风格，强营销冲击力，扫光、闪白、数字爆点",
+        tech: "科技感数据流，AI问答界面抽象化，关键词粒子、搜索结果高亮、HUD信息层，避免复刻具体平台UI",
+        ugc: "竖屏口播广告节奏，镜头近、字幕大、转场直接，真实但不出现可识别真人脸",
+        product: "干净商业产品展示，强对比背景，细节特写、卖点标签、使用场景切换",
+        cinematic: "电影感商业片，高级光影，镜头推拉稳定，品牌质感强，文字少而有力",
+      };
+
+      const rhythmMap = {
+        beat: "文字弹出、转场、数字爆点全部跟随鼓点卡点，快速推镜头、闪白转场、文字震动",
+        fast: "快剪信息流节奏，每个镜头停留短，卖点密集但核心文字清晰",
+        business: "稳重商务节奏，镜头推进有秩序，信息层级清楚，减少夸张跳动",
+        talking: "口播带货节奏，字幕跟随语句分段出现，重点词放大强调，CTA明确",
+      };
+
+      const audioMap = {
+        voice: "背景音乐轻微推进，旁白为{voice}，语速快但清晰，和画面节奏同步",
+        bgm: "背景音乐有推进感但不喧宾夺主，旁白可少量或不出现，节奏跟随画面转场",
+        drum: "史诗战鼓氛围，鼓点强、推进感强、结尾高燃，文字和数字跟随重鼓点爆发",
+        silent: "无声视频也成立，依靠大字标题、字幕层级和视觉节奏传达信息，不需要旁白",
+      };
+
+      const defaultRestrictions = [
+        "不要出现真实可识别真人脸",
+        "不要出现具体平台UI侵权画面",
+        "核心文字必须清晰可读，不要杂乱小字",
+        "不要出现二维码、联系方式、水印或品牌Logo",
+      ];
+
+      const fields = {
+        quickIdea: document.querySelector("#quickIdea"),
+        product: document.querySelector("#product"),
+        audience: document.querySelector("#audience"),
+        goal: document.querySelector("#goal"),
+        duration: document.querySelector("#duration"),
+        size: document.querySelector("#size"),
+        model: document.querySelector("#model"),
+        style: document.querySelector("#style"),
+        rhythm: document.querySelector("#rhythm"),
+        audio: document.querySelector("#audio"),
+        voice: document.querySelector("#voice"),
+        benefits: document.querySelector("#benefits"),
+        offer: document.querySelector("#offer"),
+        cta: document.querySelector("#cta"),
+        restrictions: document.querySelector("#restrictions"),
+        fullPrompt: document.querySelector("#fullPrompt"),
+        compactPrompt: document.querySelector("#compactPrompt"),
+        paramAdvice: document.querySelector("#paramAdvice"),
+      };
+
+      const hotCards = document.querySelector("#hotCards");
+      const filterRow = document.querySelector("#filterRow");
+      const toast = document.querySelector("#toast");
+      let activeCategory = "全部";
+      let activePreset = promptLibrary[0];
+
+      init();
+
+      function init() {
+        renderFilters();
+        renderCards();
+        applyPreset(promptLibrary[0], { silent: true });
+        generatePrompts();
+
+        document.querySelector("#quickGenerateButton").addEventListener("click", generateFromQuickIdea);
+        document.querySelector("#generateButton").addEventListener("click", generatePrompts);
+        document.querySelector("#resetButton").addEventListener("click", resetForm);
+        document.querySelector("#copyFullButton").addEventListener("click", () => copyText(fields.fullPrompt.value, "完整提示词已复制"));
+        document.querySelector("#copyCompactButton").addEventListener("click", () => copyText(fields.compactPrompt.value, "压缩版提示词已复制"));
+        document.querySelector("#copyPageButton").addEventListener("click", () => copyText(fields.fullPrompt.value, "当前提示词已复制"));
+        document.querySelector("#writeVideoButton").addEventListener("click", writeToVideo);
+        document.querySelector("#showAllButton").addEventListener("click", () => {
+          activeCategory = "全部";
+          renderFilters();
+          renderCards({ limit: 99 });
+          document.querySelector("#hotCards").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        document.querySelectorAll("[data-quick]").forEach((button) => {
+          button.addEventListener("click", () => {
+            fields.quickIdea.value = button.dataset.quick;
+            generateFromQuickIdea();
+          });
+        });
+      }
+
+      function renderFilters() {
+        const categories = ["全部", ...new Set(promptLibrary.map((item) => item.category))];
+        filterRow.innerHTML = categories
+          .map((category) => `<button class="${category === activeCategory ? "active" : ""}" type="button" data-category="${category}">${category}</button>`)
+          .join("");
+        filterRow.querySelectorAll("button").forEach((button) => {
+          button.addEventListener("click", () => {
+            activeCategory = button.dataset.category;
+            renderFilters();
+            renderCards();
+          });
+        });
+      }
+
+      function renderCards(options = {}) {
+        const items = promptLibrary.filter((item) => activeCategory === "全部" || item.category === activeCategory);
+        const visible = items.slice(0, options.limit || 6);
+        hotCards.innerHTML = visible
+          .map((item) => {
+            const preview = `主体：${item.product}。场景：${item.scenes[0]}。运动：${rhythmMap[item.rhythm]}。风格：${styleMap[item.style]}。`;
+            return `
+              <article class="prompt-card" style="--card-color:${item.color}">
+                <div class="thumb">${buildCardArt(item)}<div class="thumb-frame"></div><div class="thumb-title">${item.title}</div></div>
+                <div class="card-body">
+                  <div class="meta-line"><strong>作者 ${item.author}</strong><span>${item.duration}s · ${item.size}</span></div>
+                  <div class="preview-box">${preview}</div>
+                  <div class="card-actions">
+                    <button class="primary" type="button" data-apply="${item.id}">立即体验</button>
+                    <button class="share" type="button" data-copy="${item.id}" aria-label="复制">⌘</button>
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+
+        hotCards.querySelectorAll("[data-apply]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const preset = promptLibrary.find((item) => item.id === button.dataset.apply);
+            applyPreset(preset);
+            document.querySelector("#agentForm").scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+
+        hotCards.querySelectorAll("[data-copy]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const preset = promptLibrary.find((item) => item.id === button.dataset.copy);
+            applyPreset(preset, { silent: true });
+            generatePrompts();
+            copyText(fields.fullPrompt.value, "提示词已复制");
+          });
+        });
+      }
+
+      function buildCardArt(item) {
+        const color = item.color || "#52d1d1";
+        const dark = "#071313";
+        const commonDefs = `
+          <defs>
+            <linearGradient id="bg-${item.id}" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="${color}"/>
+              <stop offset="1" stop-color="${dark}"/>
+            </linearGradient>
+            <filter id="shadow-${item.id}" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="4" dy="4" stdDeviation="0" flood-color="#050505" flood-opacity="0.55"/>
+            </filter>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#bg-${item.id})"/>
+          <g opacity="0.16">${Array.from({ length: 14 }, (_, index) => `<path d="M${20 + index * 24} 0V210" stroke="#fff" stroke-width="2"/>`).join("")}</g>
+        `;
+        const scenes = {
+          geo: `
+            <g filter="url(#shadow-${item.id})">
+              <rect x="42" y="40" width="246" height="46" rx="4" fill="#fff" stroke="#050505" stroke-width="3"/>
+              <circle cx="68" cy="63" r="12" fill="${color}" stroke="#050505" stroke-width="3"/>
+              <path d="M78 73l18 15" stroke="#050505" stroke-width="5" stroke-linecap="round"/>
+              <text x="112" y="70" fill="#050505" font-size="18" font-weight="900">AI SEARCH</text>
+              <rect x="58" y="105" width="118" height="26" fill="#ffe04f" stroke="#050505" stroke-width="3"/>
+              <rect x="188" y="105" width="96" height="26" fill="#fff" stroke="#050505" stroke-width="3"/>
+              <path d="M76 154h188M96 170h128" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+              <path d="M306 36l18 32 32 8-28 18 4 34-26-22-32 12 12-32-22-26 34 2z" fill="#52d1d1" stroke="#050505" stroke-width="3"/>
+            </g>
+          `,
+          local: `
+            <g filter="url(#shadow-${item.id})">
+              <rect x="56" y="56" width="242" height="108" fill="#fffdf6" stroke="#050505" stroke-width="4"/>
+              <rect x="44" y="40" width="268" height="38" fill="${color}" stroke="#050505" stroke-width="4"/>
+              <text x="82" y="66" fill="#050505" font-size="20" font-weight="900">LOCAL SHOP</text>
+              <rect x="82" y="98" width="58" height="66" fill="#ff914d" stroke="#050505" stroke-width="3"/>
+              <rect x="160" y="98" width="106" height="38" fill="#52d1d1" stroke="#050505" stroke-width="3"/>
+              <circle cx="122" cy="180" r="12" fill="#ffe04f" stroke="#050505" stroke-width="3"/>
+              <circle cx="178" cy="180" r="12" fill="#ffe04f" stroke="#050505" stroke-width="3"/>
+              <circle cx="236" cy="180" r="12" fill="#ffe04f" stroke="#050505" stroke-width="3"/>
+            </g>
+          `,
+          saas: `
+            <g filter="url(#shadow-${item.id})">
+              <rect x="50" y="34" width="256" height="142" rx="4" fill="#f7f7f7" stroke="#050505" stroke-width="4"/>
+              <rect x="50" y="34" width="256" height="28" fill="${color}" stroke="#050505" stroke-width="4"/>
+              <path d="M82 138l36-42 42 24 48-58 50 38" fill="none" stroke="#050505" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="78" y="78" width="52" height="18" fill="#ffe04f" stroke="#050505" stroke-width="3"/>
+              <rect x="210" y="78" width="54" height="18" fill="#ff616d" stroke="#050505" stroke-width="3"/>
+              <circle cx="118" cy="138" r="8" fill="#fff"/>
+              <circle cx="208" cy="80" r="8" fill="#fff"/>
+              <path d="M320 56v92l28-18" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+            </g>
+          `,
+          ecommerce: `
+            <g filter="url(#shadow-${item.id})">
+              <rect x="72" y="56" width="118" height="118" rx="12" fill="#fff" stroke="#050505" stroke-width="4"/>
+              <path d="M96 86h70l-10 54h-50z" fill="${color}" stroke="#050505" stroke-width="4"/>
+              <path d="M106 86c0-28 50-28 50 0" fill="none" stroke="#050505" stroke-width="4"/>
+              <rect x="212" y="58" width="94" height="34" fill="#ff616d" stroke="#050505" stroke-width="4"/>
+              <text x="230" y="82" fill="#fff" font-size="22" font-weight="900">SALE</text>
+              <path d="M220 124h82M220 148h58" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+              <circle cx="308" cy="146" r="24" fill="#ffe04f" stroke="#050505" stroke-width="4"/>
+              <text x="293" y="154" fill="#050505" font-size="20" font-weight="900">%</text>
+            </g>
+          `,
+          course: `
+            <g filter="url(#shadow-${item.id})">
+              <rect x="64" y="44" width="96" height="126" fill="#fff" stroke="#050505" stroke-width="4"/>
+              <rect x="92" y="68" width="96" height="126" fill="#ffe04f" stroke="#050505" stroke-width="4"/>
+              <rect x="120" y="92" width="126" height="86" fill="#fff" stroke="#050505" stroke-width="4"/>
+              <text x="142" y="126" fill="#050505" font-size="20" font-weight="900">PROMPT</text>
+              <path d="M148 146h68M148 162h48" stroke="#050505" stroke-width="5" stroke-linecap="round"/>
+              <path d="M274 52l44 44M318 52l-44 44" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+            </g>
+          `,
+          brand: `
+            <g filter="url(#shadow-${item.id})">
+              <circle cx="176" cy="104" r="52" fill="#fff" stroke="#050505" stroke-width="4"/>
+              <text x="139" y="115" fill="#050505" font-size="24" font-weight="900">BRAND</text>
+              <rect x="54" y="50" width="70" height="40" fill="#ffe04f" stroke="#050505" stroke-width="4"/>
+              <rect x="238" y="50" width="70" height="40" fill="#52d1d1" stroke="#050505" stroke-width="4"/>
+              <rect x="68" y="140" width="80" height="36" fill="#ff616d" stroke="#050505" stroke-width="4"/>
+              <rect x="222" y="140" width="80" height="36" fill="#83d783" stroke="#050505" stroke-width="4"/>
+              <path d="M124 70l52 34 62-34M148 158l28-54 46 54" stroke="#fff" stroke-width="6"/>
+            </g>
+          `,
+          travel: `
+            <g filter="url(#shadow-${item.id})">
+              <path d="M52 156c44-58 68-72 104-42 28 24 58 22 122-50l48 92z" fill="#83d783" stroke="#050505" stroke-width="4"/>
+              <circle cx="280" cy="52" r="26" fill="#ffe04f" stroke="#050505" stroke-width="4"/>
+              <path d="M86 64c38 4 66 20 84 48 22 34 56 50 106 42" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-dasharray="12 12"/>
+              <path d="M96 52l20 36 36 8-32 20 4 38-28-26-36 14 16-36-24-30 38 4z" fill="#ff616d" stroke="#050505" stroke-width="3"/>
+            </g>
+          `,
+          story: `
+            <g filter="url(#shadow-${item.id})">
+              <rect x="54" y="44" width="110" height="126" fill="#fff" stroke="#050505" stroke-width="4"/>
+              <rect x="196" y="44" width="110" height="126" fill="#ffe04f" stroke="#050505" stroke-width="4"/>
+              <text x="76" y="86" fill="#050505" font-size="22" font-weight="900">痛点</text>
+              <text x="218" y="86" fill="#050505" font-size="22" font-weight="900">反转</text>
+              <path d="M92 126h36M234 126h36M86 146h48M226 146h58" stroke="#050505" stroke-width="6" stroke-linecap="round"/>
+              <path d="M164 106h32M184 86l20 20-20 20" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            </g>
+          `,
+          tech: `
+            <g filter="url(#shadow-${item.id})">
+              <circle cx="178" cy="104" r="54" fill="#071313" stroke="#fff" stroke-width="4"/>
+              <circle cx="178" cy="104" r="24" fill="${color}" stroke="#050505" stroke-width="4"/>
+              ${[[82,58],[276,58],[76,156],[284,154],[178,36],[178,178]].map(([x,y]) => `<circle cx="${x}" cy="${y}" r="10" fill="#ffe04f" stroke="#050505" stroke-width="3"/><path d="M${x} ${y}L178 104" stroke="#fff" stroke-width="4"/>`).join("")}
+              <path d="M232 92h76M232 116h54" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+            </g>
+          `,
+        };
+        const art = scenes[item.id] || scenes.geo;
+        return `<svg class="thumb-art" viewBox="0 0 360 210" role="img" aria-label="${escapeHtml(item.title)} illustration" preserveAspectRatio="xMidYMid slice">${commonDefs}${art}</svg>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function applyPreset(preset, options = {}) {
+        if (!preset) return;
+        activePreset = preset;
+        fields.product.value = preset.product;
+        fields.audience.value = preset.audience;
+        fields.goal.value = preset.goal;
+        fields.duration.value = String(preset.duration);
+        fields.size.value = preset.size;
+        fields.style.value = preset.style;
+        fields.rhythm.value = preset.rhythm;
+        fields.audio.value = preset.audio;
+        fields.voice.value = preset.voice;
+        fields.benefits.value = preset.benefits.join("\n");
+        fields.offer.value = preset.offer;
+        fields.cta.value = preset.cta;
+        fields.restrictions.value = defaultRestrictions.join("\n");
+        generatePrompts();
+        if (!options.silent) showToast(`已套用：${preset.title}`);
+      }
+
+      function generateFromQuickIdea() {
+        const idea = fields.quickIdea.value.trim();
+        if (!idea) {
+          showToast("先写一句视频需求");
+          return;
+        }
+        const best = findBestPreset(idea);
+        applyPreset(best, { silent: true });
+        fields.product.value = extractProductName(idea, best.product);
+        fields.duration.value = /15/.test(idea) ? "15" : /10/.test(idea) ? "10" : /5/.test(idea) ? "5" : "8";
+        fields.size.value = /横屏|16:9/.test(idea) ? "16:9" : /方形|1:1/.test(idea) ? "1:1" : /超宽|21:9/.test(idea) ? "21:9" : /自适应|adaptive/i.test(idea) ? "adaptive" : "9:16";
+        fields.audio.value = /无声/.test(idea) ? "silent" : /鼓点|战鼓|卡点/.test(idea) ? "drum" : "voice";
+        fields.rhythm.value = /稳重|商务/.test(idea) ? "business" : /口播/.test(idea) ? "talking" : /快剪/.test(idea) ? "fast" : "beat";
+        fields.style.value = /科技|数据/.test(idea) ? "tech" : /电影/.test(idea) ? "cinematic" : /产品/.test(idea) ? "product" : "viral";
+        if (/优惠|折扣|特惠|%/.test(idea)) fields.offer.value = idea.match(/[^，。；;]*(优惠|折扣|特惠|%)[^，。；;]*/)?.[0] || fields.offer.value;
+        generatePrompts();
+        document.querySelector("#agentForm").scrollIntoView({ behavior: "smooth", block: "start" });
+        showToast("已根据需求生成结构化提示词");
+      }
+
+      function findBestPreset(text) {
+        const rules = [
+          [/GEO|AI搜索|招商|代理/, "geo"],
+          [/门店|本地|同城|到店|餐饮|美业/, "local"],
+          [/SaaS|软件|系统|CRM|工具/, "saas"],
+          [/电商|产品|下单|卖点|直播间/, "ecommerce"],
+          [/课程|资料|训练营|知识付费/, "course"],
+          [/品牌|企业|曝光/, "brand"],
+          [/旅行|景点|路线|目的地/, "travel"],
+          [/剧情|反转|痛点/, "story"],
+          [/AI能力|发布|科技|数据流/, "tech"],
+        ];
+        const match = rules.find(([pattern]) => pattern.test(text));
+        return promptLibrary.find((item) => item.id === (match?.[1] || "geo")) || promptLibrary[0];
+      }
+
+      function extractProductName(text, fallback) {
+        const cleaned = text.split(/[，,。；;]/)[0]?.trim();
+        return cleaned && cleaned.length <= 28 ? cleaned : fallback;
+      }
+
+      function generatePrompts() {
+        const context = getContext();
+        const segments = buildTimelineSegments(context.duration);
+        const sceneLines = segments.map((segment, index) => buildSceneLine(segment, index, context));
+        const audioPrompt = buildAudioPrompt(context);
+        const restrictions = context.restrictions.length ? context.restrictions.join("；") : defaultRestrictions.join("；");
+
+        fields.fullPrompt.value = [
+          `请制作一条 ${context.duration} 秒、${context.size} 比例的 ${context.product} ${context.goal} 宣传视频。`,
+          `目标用户：${context.audience}。`,
+          `核心卖点：${context.benefits.join("；")}。`,
+          `优惠/利益点：${context.offer}。`,
+          `行动号召：${context.cta}。`,
+          "",
+          "分镜脚本：",
+          ...sceneLines,
+          "",
+          `画面风格：${styleMap[context.style]}。`,
+          `节奏与运镜：${rhythmMap[context.rhythm]}。`,
+          `音频：${audioPrompt}。`,
+          `限制：${restrictions}。`,
+          "整体要求：主体、场景、运动、镜头、美学、风格和音频都要明确；中文核心大字必须清晰可读；信息层级简洁，避免密集小字和侵权界面。",
+        ].join("\n");
+
+        fields.compactPrompt.value = [
+          `${context.duration}s ${context.size} ${context.product} ${context.goal} 视频，面向${context.audience}。`,
+          `卖点：${context.benefits.join("、")}；利益点：${context.offer}；CTA：${context.cta}。`,
+          `按 ${segments.map((segment) => `${segment.start}-${segment.end}s`).join(" / ")} 分镜推进：${context.scenes.join("；")}。`,
+          `风格：${styleMap[context.style]}。节奏：${rhythmMap[context.rhythm]}。音频：${audioPrompt}。`,
+          `限制：${restrictions}。核心中文大字清晰，不要真实可识别真人脸，不要平台侵权UI，不要水印二维码。`,
+        ].join("\n");
+
+        fields.paramAdvice.value = [
+          `model: ${context.model}`,
+          `duration: ${context.duration}`,
+          `size: ${context.size}`,
+          "resolution: 建议 720p；成本敏感可用 480p，发布级再用 720p。",
+          `generate_audio: ${context.audio === "silent" || context.voice === "不需要旁白" ? "false" : "true"}`,
+          "参考素材建议：可使用品牌主视觉、产品图、抽象数据流参考图；参考视频需公网可访问，避免清晰真人脸、平台UI、二维码和水印。",
+        ].join("\n");
+      }
+
+      function getContext() {
+        const benefits = splitLines(fields.benefits.value).slice(0, 3);
+        const matchingPreset = promptLibrary.find((item) => item.product === fields.product.value.trim()) || activePreset;
+        return {
+          product: fields.product.value.trim() || matchingPreset.product,
+          audience: fields.audience.value.trim() || matchingPreset.audience,
+          goal: fields.goal.value,
+          duration: Number(fields.duration.value || 8),
+          size: fields.size.value,
+          model: fields.model.value,
+          style: fields.style.value,
+          rhythm: fields.rhythm.value,
+          audio: fields.audio.value,
+          voice: fields.voice.value,
+          benefits: benefits.length ? benefits : matchingPreset.benefits,
+          offer: fields.offer.value.trim() || matchingPreset.offer,
+          cta: fields.cta.value.trim() || matchingPreset.cta,
+          scenes: matchingPreset.scenes,
+          restrictions: splitLines(fields.restrictions.value),
+        };
+      }
+
+      function buildTimelineSegments(duration) {
+        if (duration <= 5) return [{ start: 0, end: 1.2 }, { start: 1.2, end: 2.6 }, { start: 2.6, end: 4 }, { start: 4, end: duration }];
+        if (duration === 8) return [{ start: 0, end: 2 }, { start: 2, end: 4 }, { start: 4, end: 6 }, { start: 6, end: 8 }];
+        if (duration === 10) return [{ start: 0, end: 2.5 }, { start: 2.5, end: 5 }, { start: 5, end: 7.5 }, { start: 7.5, end: 10 }];
+        return [{ start: 0, end: 3 }, { start: 3, end: 6 }, { start: 6, end: 10 }, { start: 10, end: 15 }];
+      }
+
+      function buildSceneLine(segment, index, context) {
+        const scene = context.scenes[index] || context.scenes[context.scenes.length - 1];
+        const headline = [
+          `${new Date().getFullYear()}，${context.product}机会爆发`,
+          context.benefits[0] || "核心卖点快速出现",
+          context.offer || "合作利益清晰展示",
+          context.cta || "立即咨询合作",
+        ][index];
+        const voiceLine = [
+          `${context.product}的新机会正在爆发。`,
+          `${context.benefits.join("、")}，全面放大转化入口。`,
+          `${context.offer}，现在入局更有优势。`,
+          `${context.cta}，抢占增长红利。`,
+        ][index];
+        return `${formatTime(segment.start)}-${formatTime(segment.end)}秒：${scene}。屏幕核心大字：“${headline}”。辅助文字保持少量、粗体、高对比。旁白：“${voiceLine}”`;
+      }
+
+      function buildAudioPrompt(context) {
+        return (audioMap[context.audio] || audioMap.voice).replace("{voice}", context.voice);
+      }
+
+      function formatTime(value) {
+        return Number.isInteger(value) ? String(value) : value.toFixed(1);
+      }
+
+      function splitLines(value) {
+        return String(value || "")
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+      }
+
+      async function copyText(text, message) {
+        if (!text.trim()) {
+          showToast("先生成提示词");
+          return;
+        }
+        await navigator.clipboard.writeText(text);
+        showToast(message);
+      }
+
+      function writeToVideo() {
+        if (!fields.fullPrompt.value.trim()) generatePrompts();
+        const payload = {
+          prompt: fields.fullPrompt.value.trim(),
+          duration: fields.duration.value,
+          size: fields.size.value,
+          model: fields.model.value,
+          generateAudio: !(fields.audio.value === "silent" || fields.voice.value === "不需要旁白"),
+        };
+        localStorage.setItem("seedancePromptDraft", JSON.stringify(payload));
+        showToast("已写入出视频草稿，正在跳转");
+        setTimeout(() => {
+          window.location.href = "/#video";
+        }, 350);
+      }
+
+      function resetForm() {
+        applyPreset(promptLibrary[0]);
+        showToast("已恢复默认模板");
+      }
+
+      let toastTimer = null;
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("show");
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
+      }
+    </script>
+  </body>
+</html>

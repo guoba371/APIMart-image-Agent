@@ -381,6 +381,21 @@
         margin-top: 16px;
       }
 
+      .agent-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .agent-grid .wide {
+        grid-column: 1 / -1;
+      }
+
+      .compact-textarea {
+        min-height: 96px;
+      }
+
       .actions,
       .tool-row {
         display: flex;
@@ -476,7 +491,7 @@
 
       .mode-switch {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 8px;
         margin-bottom: 18px;
         padding: 4px;
@@ -579,6 +594,33 @@
       .edited-prompt {
         margin-top: 12px;
         min-height: 170px;
+      }
+
+      .agent-output {
+        margin-top: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .output-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface-soft);
+        padding: 14px;
+      }
+
+      .output-card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+      }
+
+      .output-card textarea {
+        min-height: 160px;
+        background: var(--surface-solid);
+      }
+
+      .output-card .compact-output {
+        min-height: 120px;
       }
 
       .hint,
@@ -837,6 +879,7 @@
 
       @media (max-width: 560px) {
         .grid,
+        .agent-grid,
         .mode-switch,
         .actions,
         .tool-row,
@@ -918,6 +961,7 @@
           <div class="mode-switch" role="tablist" aria-label="生成类型">
             <button id="imageModeButton" class="mode-button active" type="button" aria-pressed="true">出图</button>
             <button id="videoModeButton" class="mode-button" type="button" aria-pressed="false">出视频</button>
+            <button id="agentModeButton" class="mode-button" type="button" aria-pressed="false">提示词</button>
           </div>
 
           <form id="form" class="mode-panel">
@@ -985,11 +1029,21 @@
 
             <div class="grid">
               <div>
+                <label for="videoModel">视频模型</label>
+                <select id="videoModel" name="model">
+                  <option value="doubao-seedance-2.0" selected>Seedance 2.0</option>
+                  <option value="wan2.5">Wan 2.5</option>
+                </select>
+              </div>
+              <div>
                 <label for="videoType">视频类型</label>
                 <select id="videoType" name="videoType">
                   <option value="text" selected>文生视频</option>
                   <option value="image">图生视频</option>
                   <option value="frames">首帧 / 尾帧</option>
+                  <option value="video">参考视频</option>
+                  <option value="audio">参考音频</option>
+                  <option value="media">参考图 / 视频 / 音频</option>
                 </select>
               </div>
               <div>
@@ -1001,6 +1055,7 @@
                   <option>4:3</option>
                   <option>3:4</option>
                   <option>21:9</option>
+                  <option value="adaptive">自适应</option>
                 </select>
               </div>
               <div>
@@ -1043,6 +1098,20 @@
               <input id="videoImageFiles" type="file" accept="image/*" multiple />
             </div>
 
+            <div id="videoReferenceInputs" style="margin-top: 14px">
+              <label for="videoReferenceUrls">参考视频 URL（最多 3 个，支持 asset://）</label>
+              <textarea id="videoReferenceUrls" name="videoUrls" class="edit-prompt" placeholder="https://example.com/reference.mp4&#10;asset://asset_a"></textarea>
+              <p class="hint">
+                按 APIMart 文档：参考视频必须能被服务器公网访问，参考视频总时长需大于 1.8 秒且小于 15.2 秒，分辨率仅支持 480P-720P，且不能包含真人。
+              </p>
+            </div>
+
+            <div id="audioReferenceInputs" style="margin-top: 14px">
+              <label for="audioReferenceUrls">参考音频 URL（最多 3 个，支持 asset://）</label>
+              <textarea id="audioReferenceUrls" name="audioUrls" class="edit-prompt" placeholder="https://example.com/speech.wav&#10;asset://asset_a"></textarea>
+              <p class="hint">参考音频不能单独使用，需配合参考图片或参考视频一起提交。</p>
+            </div>
+
             <div id="videoFrameInputs" class="grid" hidden>
               <div>
                 <label for="firstFrameUrl">首帧 URL</label>
@@ -1072,6 +1141,149 @@
             <div class="actions">
               <button id="videoSubmitButton" class="primary" type="submit">生成视频</button>
               <button id="videoResetButton" class="ghost" type="button">清空</button>
+            </div>
+          </form>
+
+          <form id="promptAgentForm" class="mode-panel" hidden>
+            <div class="section-title">
+              <h2>Seedance 2.0 营销提示词 Agent</h2>
+              <span class="key-badge">本地规则生成</span>
+            </div>
+            <p class="subtitle" style="margin-top: 0">面向招商、获客、品牌曝光和转化短视频，不调用额外模型，不产生 API 费用。</p>
+
+            <div class="agent-grid">
+              <div>
+                <label for="agentTemplate">场景模板</label>
+                <select id="agentTemplate">
+                  <option value="geo" selected>GEO / AI搜索优化招商</option>
+                  <option value="local">本地生活门店引流</option>
+                  <option value="saas">SaaS 工具获客</option>
+                  <option value="ecommerce">电商产品卖点视频</option>
+                  <option value="course">课程 / 资料包引流</option>
+                  <option value="brand">企业品牌曝光</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentGoal">视频目标</label>
+                <select id="agentGoal">
+                  <option value="招商" selected>招商</option>
+                  <option value="获客">获客</option>
+                  <option value="品牌曝光">品牌曝光</option>
+                  <option value="转化下单">转化下单</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentProduct">产品 / 服务名称</label>
+                <input id="agentProduct" placeholder="例如：GEO AI搜索优化代理" value="GEO AI搜索优化代理" />
+              </div>
+              <div>
+                <label for="agentAudience">目标用户</label>
+                <input id="agentAudience" placeholder="例如：企业老板、营销从业者、个人创业者" value="企业老板、营销从业者、个人创业者" />
+              </div>
+              <div class="wide">
+                <label for="agentBenefits">卖点（每行 1 条，建议 1-3 条）</label>
+                <textarea id="agentBenefits" class="compact-textarea">关键词全AI优化
+企业品牌快速收录
+优质词 / 竞争词优化</textarea>
+              </div>
+              <div>
+                <label for="agentOffer">优惠 / 利益点</label>
+                <input id="agentOffer" value="首月合作特惠，最高50%优惠" />
+              </div>
+              <div>
+                <label for="agentCta">行动号召</label>
+                <input id="agentCta" value="招募代理 / 个人合作中" />
+              </div>
+              <div>
+                <label for="agentDuration">时长</label>
+                <select id="agentDuration">
+                  <option value="5">5 秒</option>
+                  <option value="8" selected>8 秒</option>
+                  <option value="10">10 秒</option>
+                  <option value="15">15 秒</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentSize">比例</label>
+                <select id="agentSize">
+                  <option value="9:16" selected>9:16</option>
+                  <option value="16:9">16:9</option>
+                  <option value="1:1">1:1</option>
+                  <option value="21:9">21:9</option>
+                  <option value="adaptive">自适应</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentStyle">视觉风格</label>
+                <select id="agentStyle">
+                  <option value="viral" selected>红黄高对比爆款</option>
+                  <option value="tech">科技数据流</option>
+                  <option value="ugc">UGC口播</option>
+                  <option value="product">产品展示</option>
+                  <option value="cinematic">电影感商业片</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentRhythm">节奏</label>
+                <select id="agentRhythm">
+                  <option value="beat" selected>强卡点</option>
+                  <option value="fast">快剪</option>
+                  <option value="business">稳重商务</option>
+                  <option value="talking">口播带货</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentAudio">音频</label>
+                <select id="agentAudio">
+                  <option value="voice" selected>有声旁白</option>
+                  <option value="bgm">BGM 氛围</option>
+                  <option value="drum">鼓点卡点</option>
+                  <option value="silent">无声</option>
+                </select>
+              </div>
+              <div>
+                <label for="agentVoice">旁白语气</label>
+                <select id="agentVoice">
+                  <option value="沉稳有力的中文男声" selected>沉稳有力男声</option>
+                  <option value="清晰利落的中文女声">清晰利落女声</option>
+                  <option value="快节奏信息流口播">快节奏口播</option>
+                  <option value="不需要旁白">不需要旁白</option>
+                </select>
+              </div>
+              <div class="wide">
+                <label for="agentRestrictions">限制词</label>
+                <textarea id="agentRestrictions" class="compact-textarea">不要出现真实可识别真人脸
+不要出现具体平台UI侵权画面
+不要生成杂乱小字，核心文字必须清晰可读
+不要出现二维码、联系方式、水印或品牌Logo</textarea>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="agentGenerateButton" class="primary" type="button">生成提示词</button>
+              <button id="agentWriteVideoButton" class="ghost" type="button">写入出视频</button>
+              <button id="agentResetButton" class="ghost" type="button">清空</button>
+            </div>
+
+            <div id="agentOutputs" class="agent-output">
+              <div class="output-card">
+                <h3>完整分镜版</h3>
+                <textarea id="agentFullPrompt" readonly placeholder="点击“生成提示词”后出现完整时间轴提示词"></textarea>
+                <div class="tool-row">
+                  <button id="agentCopyFullButton" class="soft" type="button">复制完整提示词</button>
+                </div>
+              </div>
+              <div class="output-card">
+                <h3>压缩投喂版</h3>
+                <textarea id="agentCompactPrompt" class="compact-output" readonly placeholder="适合模型不稳定时使用的短版本"></textarea>
+                <div class="tool-row">
+                  <button id="agentCopyCompactButton" class="soft" type="button">复制压缩版</button>
+                </div>
+              </div>
+              <div class="output-card">
+                <h3>参数建议</h3>
+                <textarea id="agentParamAdvice" class="compact-output" readonly placeholder="duration、size、generate_audio 与参考素材建议"></textarea>
+              </div>
             </div>
           </form>
 
@@ -1168,8 +1380,10 @@
     <script>
       const form = document.querySelector("#form");
       const videoForm = document.querySelector("#videoForm");
+      const promptAgentForm = document.querySelector("#promptAgentForm");
       const imageModeButton = document.querySelector("#imageModeButton");
       const videoModeButton = document.querySelector("#videoModeButton");
+      const agentModeButton = document.querySelector("#agentModeButton");
       const themeToggleButton = document.querySelector("#themeToggleButton");
       const apiKeyInput = document.querySelector("#apiKeyInput");
       const saveApiKeyButton = document.querySelector("#saveApiKeyButton");
@@ -1181,11 +1395,19 @@
       const promptEl = document.querySelector("#prompt");
       const imageCountSelect = document.querySelector("#n");
       const videoPrompt = document.querySelector("#videoPrompt");
+      const videoModel = document.querySelector("#videoModel");
       const videoType = document.querySelector("#videoType");
+      const videoSize = document.querySelector("#videoSize");
+      const videoDuration = document.querySelector("#videoDuration");
+      const generateAudio = document.querySelector("#generateAudio");
       const videoImageInputs = document.querySelector("#videoImageInputs");
+      const videoReferenceInputs = document.querySelector("#videoReferenceInputs");
+      const audioReferenceInputs = document.querySelector("#audioReferenceInputs");
       const videoFrameInputs = document.querySelector("#videoFrameInputs");
       const imageReferenceFiles = document.querySelector("#imageReferenceFiles");
       const videoImageUrls = document.querySelector("#videoImageUrls");
+      const videoReferenceUrls = document.querySelector("#videoReferenceUrls");
+      const audioReferenceUrls = document.querySelector("#audioReferenceUrls");
       const videoImageFiles = document.querySelector("#videoImageFiles");
       const firstFrameUrl = document.querySelector("#firstFrameUrl");
       const firstFrameFile = document.querySelector("#firstFrameFile");
@@ -1193,6 +1415,28 @@
       const lastFrameFile = document.querySelector("#lastFrameFile");
       const videoSubmitButton = document.querySelector("#videoSubmitButton");
       const videoResetButton = document.querySelector("#videoResetButton");
+      const agentTemplate = document.querySelector("#agentTemplate");
+      const agentGoal = document.querySelector("#agentGoal");
+      const agentProduct = document.querySelector("#agentProduct");
+      const agentAudience = document.querySelector("#agentAudience");
+      const agentBenefits = document.querySelector("#agentBenefits");
+      const agentOffer = document.querySelector("#agentOffer");
+      const agentCta = document.querySelector("#agentCta");
+      const agentDuration = document.querySelector("#agentDuration");
+      const agentSize = document.querySelector("#agentSize");
+      const agentStyle = document.querySelector("#agentStyle");
+      const agentRhythm = document.querySelector("#agentRhythm");
+      const agentAudio = document.querySelector("#agentAudio");
+      const agentVoice = document.querySelector("#agentVoice");
+      const agentRestrictions = document.querySelector("#agentRestrictions");
+      const agentGenerateButton = document.querySelector("#agentGenerateButton");
+      const agentWriteVideoButton = document.querySelector("#agentWriteVideoButton");
+      const agentResetButton = document.querySelector("#agentResetButton");
+      const agentFullPrompt = document.querySelector("#agentFullPrompt");
+      const agentCompactPrompt = document.querySelector("#agentCompactPrompt");
+      const agentParamAdvice = document.querySelector("#agentParamAdvice");
+      const agentCopyFullButton = document.querySelector("#agentCopyFullButton");
+      const agentCopyCompactButton = document.querySelector("#agentCopyCompactButton");
       const promptTools = document.querySelector("#promptTools");
       const editedPrompt = document.querySelector("#editedPrompt");
       const submitButton = document.querySelector("#submitButton");
@@ -1231,6 +1475,27 @@
       let selectedReferenceUrls = [];
       let currentMode = "image";
 
+      const videoModelCapabilities = {
+        "doubao-seedance-2.0": {
+          image: true,
+          frames: true,
+          video: true,
+          audio: true,
+          media: true,
+          generateAudio: true,
+          returnLastFrame: true,
+        },
+        "wan2.5": {
+          image: true,
+          frames: false,
+          video: false,
+          audio: false,
+          media: false,
+          generateAudio: false,
+          returnLastFrame: false,
+        },
+      };
+
       const riskRules = [
         { pattern: /\byoung\b|少女|女孩|未成年|teen|teenage/i, label: "年龄表述模糊", level: "danger", replacement: "adult" },
         { pattern: /sensual|sexy|seductive|erotic|性暗示|性感|挑逗/i, label: "成人或性暗示词", level: "danger", replacement: "quiet editorial mood" },
@@ -1247,6 +1512,109 @@
         negative: negativeButton,
       };
 
+      const agentTemplates = {
+        geo: {
+          product: "GEO AI搜索优化代理",
+          audience: "企业老板、营销从业者、个人创业者",
+          benefits: ["关键词全AI优化", "企业品牌快速收录", "优质词 / 竞争词优化"],
+          offer: "首月合作特惠，最高50%优惠",
+          cta: "招募代理 / 个人合作中",
+          scenes: [
+            "AI搜索流量爆发，搜索框、AI问答界面、关键词数据流快速闪过",
+            "企业品牌信息被AI回答引用，搜索结果高亮，关键词排名上升",
+            "合作利益和代理政策强势出现，数字爆点、增长箭头、金币粒子",
+            "GEO主视觉从数据流中冲出，形成招商行动号召",
+          ],
+        },
+        local: {
+          product: "本地生活门店引流方案",
+          audience: "餐饮店、美业店、同城服务老板",
+          benefits: ["短视频曝光获客", "团购转化提升", "门店口碑内容放大"],
+          offer: "低门槛试运营，先测效果再放量",
+          cta: "预约门店诊断",
+          scenes: [
+            "门店招牌、客流动线和同城热搜词快速闪过",
+            "顾客到店、服务亮点和口碑标签以卡点字幕呈现",
+            "优惠套餐、到店理由和转化按钮集中爆发",
+            "门店品牌定格，行动号召清晰出现",
+          ],
+        },
+        saas: {
+          product: "SaaS 增长工具",
+          audience: "中小企业老板、运营负责人、销售团队",
+          benefits: ["自动化线索管理", "数据看板实时追踪", "销售流程提效"],
+          offer: "免费体验核心功能",
+          cta: "立即预约演示",
+          scenes: [
+            "混乱表格和线索消息堆叠，切到清晰仪表盘",
+            "自动分配、跟进提醒、转化漏斗逐层点亮",
+            "效率提升数字和团队协同画面快速呈现",
+            "产品界面抽象化展示，CTA按钮高亮收尾",
+          ],
+        },
+        ecommerce: {
+          product: "高转化电商产品",
+          audience: "追求性价比和效率的线上消费者",
+          benefits: ["核心卖点一眼看懂", "使用场景真实清晰", "限时优惠刺激下单"],
+          offer: "限时到手价，赠品加码",
+          cta: "现在下单",
+          scenes: [
+            "产品从干净背景中快速推近，卖点大字压入",
+            "使用前后对比、细节特写和场景化体验切换",
+            "价格利益、赠品和库存紧迫感集中出现",
+            "产品主视觉定格，购买按钮和CTA收尾",
+          ],
+        },
+        course: {
+          product: "AI 编程提示词卡片包",
+          audience: "AI编程新手、独立创作者、Vibe Coder",
+          benefits: ["复制即用", "覆盖高频开发场景", "减少反复试错"],
+          offer: "早期整理版限时价",
+          cta: "获取资料包",
+          scenes: [
+            "新手面对空白项目和报错信息，焦虑感快速出现",
+            "提示词卡片、任务拆解和验证清单依次展开",
+            "从需求到页面、修bug、跑验证的流程快速串联",
+            "资料包封面和获取入口定格",
+          ],
+        },
+        brand: {
+          product: "企业品牌增长方案",
+          audience: "成长型企业、品牌负责人、营销团队",
+          benefits: ["统一品牌表达", "提升搜索可见度", "沉淀长期内容资产"],
+          offer: "品牌诊断方案开放申请",
+          cta: "申请品牌诊断",
+          scenes: [
+            "品牌资产、搜索结果、内容矩阵从碎片状态聚合",
+            "品牌关键词、案例背书和客户信任标签逐个点亮",
+            "曝光、询盘、转化的增长路径形成清晰图谱",
+            "品牌主张和行动号召高级感定格",
+          ],
+        },
+      };
+
+      const agentStyleMap = {
+        viral: "红白黄高对比，粗体中文大字，信息流爆款广告风格，强营销冲击力，扫光、闪白、数字爆点",
+        tech: "深色科技感数据流，蓝绿光效，AI界面抽象化，关键词粒子、搜索结果高亮、HUD信息层",
+        ugc: "竖屏口播广告节奏，字幕大、镜头近、转场直接，真实但不出现可识别真人脸",
+        product: "干净商业产品展示，强对比背景，细节特写、卖点标签、使用场景切换",
+        cinematic: "电影感商业片，克制高级光影，镜头推拉稳定，品牌质感强，文字少而有力",
+      };
+
+      const agentRhythmMap = {
+        beat: "画面、文字弹出、数字爆点全部跟随鼓点卡点，快速推镜头、闪白转场、文字震动",
+        fast: "快剪信息流节奏，每个镜头停留很短，卖点密集但核心文字保持清晰",
+        business: "稳重商务节奏，镜头推进有秩序，信息层级清楚，减少夸张跳动",
+        talking: "口播带货节奏，字幕跟随语句分段出现，重点词放大强调，CTA明确",
+      };
+
+      const agentAudioMap = {
+        voice: "背景音乐轻微推进，旁白为{voice}，语速快但清晰，和画面卡点同步",
+        bgm: "背景音乐有推进感但不喧宾夺主，无需明显旁白，节奏跟随画面转场",
+        drum: "背景音乐为史诗战鼓氛围，鼓点强、推进感强、结尾高燃，文字和数字跟随重鼓点爆发",
+        silent: "无声视频也成立，依靠大字标题、字幕层级和视觉节奏传达信息，不需要旁白",
+      };
+
       init();
       analyzeCurrentPrompt();
       apiKeyInput.value = localStorage.getItem("apimartApiKey") || "";
@@ -1257,6 +1625,10 @@
         try {
           const config = await api("/api/config");
           modelName.textContent = config.model;
+          if (config.videoModel && [...videoModel.options].some((option) => option.value === config.videoModel)) {
+            videoModel.value = config.videoModel;
+            updateVideoModelCapabilities();
+          }
           updateApiKeyStatus(config.hasApiKey);
         } catch (error) {
           configText.textContent = "配置读取失败";
@@ -1296,7 +1668,17 @@
       imageCountSelect.addEventListener("change", updateImageSubmitText);
       imageModeButton.addEventListener("click", () => setMode("image"));
       videoModeButton.addEventListener("click", () => setMode("video"));
+      agentModeButton.addEventListener("click", () => {
+        window.location.href = "/prompts.html";
+      });
+      videoModel.addEventListener("change", updateVideoModelCapabilities);
       videoType.addEventListener("change", updateVideoInputs);
+      agentTemplate.addEventListener("change", applyAgentTemplate);
+      agentGenerateButton.addEventListener("click", generateAgentPrompts);
+      agentCopyFullButton.addEventListener("click", () => copyAgentText(agentFullPrompt, "完整提示词已复制。"));
+      agentCopyCompactButton.addEventListener("click", () => copyAgentText(agentCompactPrompt, "压缩版提示词已复制。"));
+      agentWriteVideoButton.addEventListener("click", writeAgentPromptToVideo);
+      agentResetButton.addEventListener("click", resetPromptAgent);
       imageReferenceFiles.addEventListener("change", async () => {
         try {
           const urls = await uploadFiles(imageReferenceFiles.files);
@@ -1331,6 +1713,11 @@
         }
       });
       updateVideoInputs();
+      updateVideoModelCapabilities();
+      applyVideoDraftFromPromptPage();
+      if (window.location.hash === "#video") {
+        setMode("video");
+      }
 
       rewriteButton.addEventListener("click", () => applyPromptTool("safe"));
       strictButton.addEventListener("click", () => applyPromptTool("strict"));
@@ -1409,31 +1796,50 @@
         clearResults({ keepEditPanel: true });
 
         const data = Object.fromEntries(new FormData(videoForm).entries());
+        const capabilities = getSelectedVideoModelCapabilities();
         const imageUrls = splitLines(videoImageUrls.value);
+        const wantsImages = ["image", "media"].includes(data.videoType) && capabilities.image;
+        const wantsVideos = ["video", "media"].includes(data.videoType) && capabilities.video;
+        const wantsAudio = ["audio", "media"].includes(data.videoType) && capabilities.audio;
+        const videoUrls = wantsVideos ? splitLines(videoReferenceUrls.value) : [];
+        const audioUrls = wantsAudio ? splitLines(audioReferenceUrls.value) : [];
         appendLog("提交视频生成任务...");
 
         try {
+          if (videoUrls.length > 3) throw new Error("参考视频最多 3 个，请减少 URL 数量。");
+          if (audioUrls.length > 3) throw new Error("参考音频最多 3 个，请减少 URL 数量。");
+          if (wantsAudio && audioUrls.length && !imageUrls.length && !videoUrls.length) {
+            throw new Error("参考音频不能单独使用，请切换到“参考图 / 视频 / 音频”并提供参考图或参考视频。");
+          }
+
+          if (data.videoType !== "text" && !capabilities[data.videoType]) {
+            throw new Error(`${getSelectedVideoModelLabel()} 不支持当前视频类型，请切换模型或视频类型。`);
+          }
+
           const response = await api("/api/videos/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              model: data.model,
               prompt: data.prompt,
               videoType: data.videoType,
               size: data.size,
               resolution: data.resolution,
               duration: data.duration,
               seed: data.seed,
-              generateAudio: data.generateAudio === "on",
-              returnLastFrame: data.returnLastFrame === "on",
-              imageUrls: data.videoType === "image" ? imageUrls : [],
-              firstFrameUrl: data.videoType === "frames" ? firstFrameUrl.value.trim() : "",
-              lastFrameUrl: data.videoType === "frames" ? lastFrameUrl.value.trim() : "",
+              generateAudio: capabilities.generateAudio && data.generateAudio === "on",
+              returnLastFrame: capabilities.returnLastFrame && data.returnLastFrame === "on",
+              imageUrls: wantsImages ? imageUrls : [],
+              videoUrls,
+              audioUrls,
+              firstFrameUrl: capabilities.frames && data.videoType === "frames" ? firstFrameUrl.value.trim() : "",
+              lastFrameUrl: capabilities.frames && data.videoType === "frames" ? lastFrameUrl.value.trim() : "",
             }),
           });
 
           taskTitle.textContent = `视频任务 ${response.taskId}`;
-          taskSubtitle.textContent = "已提交 Doubao Seedance 2.0 视频任务，等待 APIMart 处理。";
-          appendLog(`视频任务已提交：${response.taskId}`);
+          taskSubtitle.textContent = `已提交 ${getSelectedVideoModelLabel()} 视频任务，等待 APIMart 处理。`;
+          appendLog(`视频任务已提交：${response.taskId}（${getSelectedVideoModelLabel()}）`);
           poll(response.taskId, Number(data.delay || 8000), "video");
         } catch (error) {
           showError(error);
@@ -1442,7 +1848,7 @@
 
       videoResetButton.addEventListener("click", () => {
         videoForm.reset();
-        updateVideoInputs();
+        updateVideoModelCapabilities();
         appendLog("已清空视频表单。");
       });
 
@@ -1493,21 +1899,233 @@
       function setMode(mode) {
         currentMode = mode;
         const isImage = mode === "image";
+        const isVideo = mode === "video";
+        const isAgent = mode === "agent";
         form.hidden = !isImage;
-        videoForm.hidden = isImage;
+        videoForm.hidden = !isVideo;
+        promptAgentForm.hidden = !isAgent;
         promptTools.hidden = !isImage;
         imageModeButton.classList.toggle("active", isImage);
-        videoModeButton.classList.toggle("active", !isImage);
+        videoModeButton.classList.toggle("active", isVideo);
+        agentModeButton.classList.toggle("active", isAgent);
         imageModeButton.setAttribute("aria-pressed", isImage ? "true" : "false");
-        videoModeButton.setAttribute("aria-pressed", !isImage ? "true" : "false");
-        taskTitle.textContent = isImage ? "等待输入" : "等待视频输入";
-        taskSubtitle.textContent = isImage ? "还没有提交任务。" : "选择文生视频、图生视频或首帧 / 尾帧后提交。";
+        videoModeButton.setAttribute("aria-pressed", isVideo ? "true" : "false");
+        agentModeButton.setAttribute("aria-pressed", isAgent ? "true" : "false");
+        taskTitle.textContent = isImage ? "等待输入" : isVideo ? "等待视频输入" : "等待提示词生成";
+        taskSubtitle.textContent = isImage
+          ? "还没有提交任务。"
+          : isVideo
+            ? "选择文生视频、图生视频、首尾帧或参考音视频后提交。"
+            : "填写营销信息后生成 Seedance 2.0 视频提示词，不会调用接口。";
       }
 
       function updateVideoInputs() {
         const type = videoType.value;
-        videoImageInputs.hidden = type !== "image";
+        videoImageInputs.hidden = !["image", "media"].includes(type);
+        videoReferenceInputs.hidden = !["video", "media"].includes(type);
+        audioReferenceInputs.hidden = !["audio", "media"].includes(type);
         videoFrameInputs.hidden = type !== "frames";
+      }
+
+      function updateVideoModelCapabilities() {
+        const capabilities = getSelectedVideoModelCapabilities();
+        for (const option of videoType.options) {
+          const value = option.value;
+          option.disabled = value !== "text" && !capabilities[value];
+        }
+
+        if (videoType.selectedOptions[0]?.disabled) {
+          videoType.value = capabilities.image ? "image" : "text";
+        }
+
+        generateAudio.disabled = !capabilities.generateAudio;
+        returnLastFrame.disabled = !capabilities.returnLastFrame;
+        if (!capabilities.generateAudio) generateAudio.checked = false;
+        if (!capabilities.returnLastFrame) returnLastFrame.checked = false;
+
+        updateVideoInputs();
+      }
+
+      function getSelectedVideoModelCapabilities() {
+        return videoModelCapabilities[videoModel.value] || videoModelCapabilities["doubao-seedance-2.0"];
+      }
+
+      function getSelectedVideoModelLabel() {
+        return videoModel.options[videoModel.selectedIndex]?.textContent || videoModel.value || "视频模型";
+      }
+
+      function applyVideoDraftFromPromptPage() {
+        const rawDraft = localStorage.getItem("seedancePromptDraft");
+        if (!rawDraft) return;
+
+        try {
+          const draft = JSON.parse(rawDraft);
+          if (draft.prompt) videoPrompt.value = draft.prompt;
+          if (draft.duration) videoDuration.value = String(draft.duration);
+          if (draft.size) videoSize.value = draft.size;
+          if (draft.model && [...videoModel.options].some((option) => option.value === draft.model)) {
+            videoModel.value = draft.model;
+          }
+          generateAudio.checked = draft.generateAudio !== false;
+          videoType.value = "text";
+          updateVideoInputs();
+          localStorage.removeItem("seedancePromptDraft");
+          appendLog("已从提示词页面回填出视频表单，未自动提交。");
+        } catch (error) {
+          localStorage.removeItem("seedancePromptDraft");
+          appendLog("提示词草稿读取失败，已清除本地草稿。");
+        }
+      }
+
+      function applyAgentTemplate() {
+        const template = agentTemplates[agentTemplate.value] || agentTemplates.geo;
+        agentProduct.value = template.product;
+        agentAudience.value = template.audience;
+        agentBenefits.value = template.benefits.join("\n");
+        agentOffer.value = template.offer;
+        agentCta.value = template.cta;
+        agentFullPrompt.value = "";
+        agentCompactPrompt.value = "";
+        agentParamAdvice.value = "";
+        appendLog(`已切换提示词模板：${agentTemplate.options[agentTemplate.selectedIndex].textContent}`);
+      }
+
+      function generateAgentPrompts() {
+        const context = getAgentContext();
+        const segments = buildTimelineSegments(context.duration);
+        const sceneLines = segments.map((segment, index) => buildSceneLine(segment, index, context));
+        const audioPrompt = buildAgentAudioPrompt(context);
+        const restrictions = context.restrictions.length ? context.restrictions.join("；") : "核心文字清晰可读，不要杂乱小字，不要侵权UI。";
+
+        const fullPrompt = [
+          `请制作一条 ${context.duration} 秒 ${context.size} 比例的 ${context.product} ${context.goal} 营销宣传视频。`,
+          `目标用户：${context.audience}。`,
+          `核心卖点：${context.benefits.join("；")}。`,
+          `优惠/利益点：${context.offer || "突出低门槛、强结果感和明确合作价值"}。`,
+          `行动号召：${context.cta || "立即咨询合作"}。`,
+          "",
+          "分镜脚本：",
+          ...sceneLines,
+          "",
+          `画面风格：${agentStyleMap[context.style]}。`,
+          `节奏与运镜：${agentRhythmMap[context.rhythm]}。`,
+          `音频：${audioPrompt}。`,
+          `限制：${restrictions}。`,
+          "整体要求：信息流爆款广告质感，商业招商感强，科技感数据流，快速推镜头、闪白转场、文字震动、扫光特效；中文核心大字必须清晰可读，画面不要堆满小字。",
+        ].join("\n");
+
+        const compactPrompt = [
+          `${context.duration}s ${context.size} vertical/marketing ad for ${context.product}，目标用户：${context.audience}。`,
+          `目标：${context.goal}；卖点：${context.benefits.join("、")}；利益点：${context.offer}；CTA：${context.cta}。`,
+          `按 ${segments.map((segment) => `${segment.start}-${segment.end}s`).join(" / ")} 分镜推进：${context.template.scenes.join("；")}。`,
+          `风格：${agentStyleMap[context.style]}。节奏：${agentRhythmMap[context.rhythm]}。音频：${audioPrompt}。`,
+          `限制：${restrictions}。核心中文大字清晰，不要真实可识别真人脸，不要平台侵权UI，不要二维码、水印、杂乱小字。`,
+        ].join("\n");
+
+        const paramAdvice = [
+          `duration: ${context.duration}`,
+          `size: ${context.size}`,
+          `resolution: 建议 720p；如需省成本可用 480p，发布级再用 720p。`,
+          `generate_audio: ${context.audio === "silent" || context.voice === "不需要旁白" ? "false" : "true"}`,
+          `videoType: 文生视频；如有参考视频，请切换到“参考视频”并确保总时长 1.8-15.2 秒、480P-720P、无真人脸。`,
+          `参考素材建议: 可提供品牌主视觉、产品图或抽象数据流参考图；不要提交带平台界面、二维码或真人清晰脸的视频。`,
+        ].join("\n");
+
+        agentFullPrompt.value = fullPrompt;
+        agentCompactPrompt.value = compactPrompt;
+        agentParamAdvice.value = paramAdvice;
+        appendLog("Seedance 营销提示词已生成，本次未调用 APIMart。");
+      }
+
+      function getAgentContext() {
+        const template = agentTemplates[agentTemplate.value] || agentTemplates.geo;
+        const benefits = splitLines(agentBenefits.value).slice(0, 3);
+        return {
+          template,
+          product: agentProduct.value.trim() || template.product,
+          audience: agentAudience.value.trim() || template.audience,
+          goal: agentGoal.value,
+          benefits: benefits.length ? benefits : template.benefits,
+          offer: agentOffer.value.trim() || template.offer,
+          cta: agentCta.value.trim() || template.cta,
+          duration: Number(agentDuration.value || 8),
+          size: agentSize.value,
+          style: agentStyle.value,
+          rhythm: agentRhythm.value,
+          audio: agentAudio.value,
+          voice: agentVoice.value,
+          restrictions: splitLines(agentRestrictions.value),
+        };
+      }
+
+      function buildTimelineSegments(duration) {
+        if (duration <= 5) return [{ start: 0, end: 1.2 }, { start: 1.2, end: 2.6 }, { start: 2.6, end: 4 }, { start: 4, end: duration }];
+        if (duration === 8) return [{ start: 0, end: 2 }, { start: 2, end: 4 }, { start: 4, end: 6 }, { start: 6, end: 8 }];
+        if (duration === 10) return [{ start: 0, end: 2.5 }, { start: 2.5, end: 5 }, { start: 5, end: 7.5 }, { start: 7.5, end: 10 }];
+        return [{ start: 0, end: 3 }, { start: 3, end: 6 }, { start: 6, end: 10 }, { start: 10, end: 15 }];
+      }
+
+      function buildSceneLine(segment, index, context) {
+        const scene = context.template.scenes[index] || context.template.scenes[context.template.scenes.length - 1];
+        const headline = [
+          `${new Date().getFullYear()}，${context.product}机会爆发`,
+          context.benefits[0] || "核心卖点快速出现",
+          context.offer || "合作利益清晰展示",
+          context.cta || "立即咨询合作",
+        ][index];
+        const voiceLine = [
+          `${context.product}的新机会正在爆发。`,
+          `${context.benefits.join("、")}，全面放大转化入口。`,
+          `${context.offer}，现在入局更有优势。`,
+          `${context.cta}，抢占增长红利。`,
+        ][index];
+        return `${formatTime(segment.start)}-${formatTime(segment.end)}秒：${scene}。屏幕核心大字：“${headline}”。辅助文字保持少量、粗体、高对比。旁白：“${voiceLine}”`;
+      }
+
+      function buildAgentAudioPrompt(context) {
+        const base = agentAudioMap[context.audio] || agentAudioMap.voice;
+        return base.replace("{voice}", context.voice);
+      }
+
+      function formatTime(value) {
+        return Number.isInteger(value) ? String(value) : value.toFixed(1);
+      }
+
+      async function copyAgentText(field, message) {
+        const text = field.value.trim();
+        if (!text) {
+          appendLog("请先生成提示词。");
+          return;
+        }
+        await navigator.clipboard.writeText(text);
+        appendLog(message);
+      }
+
+      function writeAgentPromptToVideo() {
+        if (!agentFullPrompt.value.trim()) generateAgentPrompts();
+        videoPrompt.value = agentFullPrompt.value.trim();
+        videoType.value = "text";
+        videoDuration.value = agentDuration.value;
+        videoSize.value = agentSize.value;
+        generateAudio.checked = !(agentAudio.value === "silent" || agentVoice.value === "不需要旁白");
+        updateVideoInputs();
+        setMode("video");
+        appendLog("已写入出视频表单，未自动提交，确认后可手动生成。");
+      }
+
+      function resetPromptAgent() {
+        promptAgentForm.reset();
+        applyAgentTemplate();
+        agentDuration.value = "8";
+        agentSize.value = "9:16";
+        agentStyle.value = "viral";
+        agentRhythm.value = "beat";
+        agentAudio.value = "voice";
+        agentVoice.value = "沉稳有力的中文男声";
+        agentFullPrompt.value = "";
+        agentCompactPrompt.value = "";
+        agentParamAdvice.value = "";
+        appendLog("提示词 Agent 已清空并恢复默认模板。");
       }
 
       function analyzeCurrentPrompt(overrideText) {
@@ -1832,9 +2450,10 @@
       async function api(url, options) {
         const apiKey = getApiKey();
         const headers = new Headers(options?.headers || {});
+        headers.set("Accept", "application/json");
         if (apiKey) headers.set("X-APIMart-API-Key", apiKey);
         const response = await fetch(url, { ...(options || {}), headers });
-        const data = await response.json();
+        const data = await parseJsonResponse(response, url);
         if (!response.ok) {
           const error = new Error(data.error || "请求失败");
           error.details = data;
@@ -1864,7 +2483,7 @@
             headers,
             body: formData,
           });
-          const data = await response.json();
+          const data = await parseJsonResponse(response, "/api/uploads/images");
           if (!response.ok) {
             const error = new Error(data.error || "图片上传失败");
             error.details = data;
@@ -1875,6 +2494,17 @@
           uploaded.push(url);
         }
         return uploaded;
+      }
+
+      async function parseJsonResponse(response, url) {
+        const text = await response.text();
+        try {
+          return text ? JSON.parse(text) : {};
+        } catch {
+          const contentType = response.headers.get("content-type") || "unknown";
+          const preview = text.replace(/\s+/g, " ").slice(0, 180);
+          throw new Error(`接口 ${url} 返回了非 JSON 响应（${response.status}，${contentType}）。当前页面：${location.href}。响应 URL：${response.url || "未知"}。内容：${preview || "空响应"}`);
+        }
       }
 
       function extractUploadUrl(data) {

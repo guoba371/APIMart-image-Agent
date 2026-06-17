@@ -8,6 +8,37 @@ const mimeTypes = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".webm": "video/webm",
+  ".m4v": "video/x-m4v",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".aac": "audio/aac",
+  ".flac": "audio/flac",
+  ".ogg": "audio/ogg",
+};
+
+const videoModels = ["doubao-seedance-2.0", "wan2.5"];
+const videoModelCapabilities = {
+  "doubao-seedance-2.0": {
+    imageUrls: true,
+    frames: true,
+    referenceVideo: true,
+    referenceAudio: true,
+    generateAudio: true,
+    returnLastFrame: true,
+  },
+  "wan2.5": {
+    imageUrls: true,
+    frames: false,
+    referenceVideo: false,
+    referenceAudio: false,
+    generateAudio: false,
+    returnLastFrame: false,
+  },
 };
 
 export function createConfig(env = {}) {
@@ -30,6 +61,8 @@ export async function handleRequest(request, env = {}, options = {}) {
         apiUrl: config.apiUrl,
         model: config.model,
         videoModel: config.videoModel,
+        videoModels,
+        videoModelCapabilities,
         hasApiKey: Boolean(config.apiKey),
       });
     }
@@ -190,31 +223,68 @@ async function handleVideoGenerate(request, config, body) {
   const firstFrameUrl = String(body.firstFrameUrl || "").trim();
   const lastFrameUrl = String(body.lastFrameUrl || "").trim();
   const imageUrls = normalizeStringArray(body.imageUrls);
-  const hasImageInput = imageUrls.length || firstFrameUrl || lastFrameUrl;
+  const videoUrls = normalizeStringArray(body.videoUrls);
+  const audioUrls = normalizeStringArray(body.audioUrls);
+  const hasFrameInput = Boolean(firstFrameUrl || lastFrameUrl);
+  const hasImageInput = imageUrls.length || hasFrameInput;
+  const hasMediaInput = hasImageInput || videoUrls.length || audioUrls.length;
 
-  if (!prompt && !hasImageInput) {
-    return jsonResponse(400, { error: "Prompt or at least one image URL is required" });
+  if (!prompt && !hasMediaInput) {
+    return jsonResponse(400, { error: "Prompt or at least one reference image, video, or audio URL is required" });
   }
 
+  if (hasFrameInput && (videoUrls.length || audioUrls.length)) {
+    return jsonResponse(400, { error: "First/last frame mode cannot be combined with reference video or audio URLs." });
+  }
+
+  const mediaUrlError = validateReferenceMedia({ imageUrls, videoUrls, audioUrls });
+  if (mediaUrlError) {
+    return jsonResponse(400, { error: mediaUrlError });
+  }
+
+  const modelResult = resolveVideoModel(body.model, config.videoModel);
+  if (modelResult.error) {
+    return jsonResponse(400, { error: modelResult.error });
+  }
+
+  const capabilityError = validateVideoModelCapabilities(modelResult.model, {
+    hasFrameInput,
+    imageUrls,
+    videoUrls,
+    audioUrls,
+    generateAudio: body.generateAudio,
+    returnLastFrame: body.returnLastFrame,
+  });
+  if (capabilityError) {
+    return jsonResponse(400, { error: capabilityError });
+  }
+
+  const capabilities = videoModelCapabilities[modelResult.model];
   const payload = {
-    model: String(body.model || config.videoModel),
+    model: modelResult.model,
     prompt,
     duration: clampInt(body.duration, 4, 15, 5),
     size: body.size || "16:9",
     resolution: body.resolution || "720p",
-    generate_audio: toBoolean(body.generateAudio),
-    return_last_frame: toBoolean(body.returnLastFrame),
   };
+
+  if (capabilities.generateAudio) payload.generate_audio = toBoolean(body.generateAudio);
+  if (capabilities.returnLastFrame) payload.return_last_frame = toBoolean(body.returnLastFrame);
 
   const seed = Number.parseInt(body.seed, 10);
   if (!Number.isNaN(seed)) payload.seed = seed;
 
-  if (firstFrameUrl || lastFrameUrl) {
+  if (capabilities.frames && (firstFrameUrl || lastFrameUrl)) {
     payload.image_with_roles = [];
     if (firstFrameUrl) payload.image_with_roles.push({ url: firstFrameUrl, role: "first_frame" });
     if (lastFrameUrl) payload.image_with_roles.push({ url: lastFrameUrl, role: "last_frame" });
-  } else if (imageUrls.length) {
+  } else if (capabilities.imageUrls && imageUrls.length) {
     payload.image_urls = imageUrls.slice(0, 9);
+  }
+
+  if (!hasFrameInput) {
+    if (capabilities.referenceVideo && videoUrls.length) payload.video_urls = videoUrls.slice(0, 3);
+    if (capabilities.referenceAudio && audioUrls.length) payload.audio_urls = audioUrls.slice(0, 3);
   }
 
   const data = await callApimart("/v1/videos/generations", apiKey, config, {
@@ -329,13 +399,26 @@ function getRequestApiKey(request, config) {
 }
 
 async function callApimart(path, apiKey, config, options = {}) {
-  const response = await fetch(`${config.apiUrl}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${config.apiUrl}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        ...(options.headers || {}),
+      },
+    });
+  } catch (error) {
+    const wrapped = new Error(`APIMart network request failed: ${error.message || error}`);
+    wrapped.statusCode = 502;
+    wrapped.userMessage = `APIMart 网络请求失败：${error.message || error}`;
+    wrapped.code = error.code || error.cause?.code || null;
+    wrapped.raw = {
+      cause: error.cause?.message || null,
+      path,
+    };
+    throw wrapped;
+  }
 
   const text = await response.text();
   const data = parseJsonOrThrow(text, `APIMart returned non-JSON response (${response.status})`);
@@ -454,6 +537,76 @@ function normalizeStringArray(value) {
   if (!value) return [];
   const list = Array.isArray(value) ? value : [value];
   return list.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function resolveVideoModel(requestedModel, configuredModel) {
+  const explicitModel = String(requestedModel || "").trim();
+  if (explicitModel) {
+    if (videoModels.includes(explicitModel)) return { model: explicitModel };
+    return { error: `Unsupported video model: ${explicitModel}. Supported models: ${videoModels.join(", ")}` };
+  }
+
+  const defaultModel = String(configuredModel || "").trim();
+  return { model: videoModels.includes(defaultModel) ? defaultModel : "doubao-seedance-2.0" };
+}
+
+function validateVideoModelCapabilities(model, input) {
+  const capabilities = videoModelCapabilities[model];
+  if (!capabilities) return `Unsupported video model: ${model}. Supported models: ${videoModels.join(", ")}`;
+
+  const unsupported = [];
+  if (input.hasFrameInput && !capabilities.frames) unsupported.push("first/last frame");
+  if (input.videoUrls.length && !capabilities.referenceVideo) unsupported.push("reference video");
+  if (input.audioUrls.length && !capabilities.referenceAudio) unsupported.push("reference audio");
+  if (toBoolean(input.generateAudio) && !capabilities.generateAudio) unsupported.push("generated audio");
+  if (toBoolean(input.returnLastFrame) && !capabilities.returnLastFrame) unsupported.push("return last frame");
+
+  if (!unsupported.length) return "";
+  return `${getVideoModelLabel(model)} does not support ${unsupported.join(", ")}. Please switch to Seedance 2.0 or remove those parameters.`;
+}
+
+function getVideoModelLabel(model) {
+  if (model === "doubao-seedance-2.0") return "Seedance 2.0";
+  if (model === "wan2.5") return "Wan 2.5";
+  return model;
+}
+
+function validateReferenceMedia({ imageUrls, videoUrls, audioUrls }) {
+  if (videoUrls.length > 3) return "参考视频最多 3 个，请按 APIMart 文档减少 video_urls 数量。";
+  if (audioUrls.length > 3) return "参考音频最多 3 个，请按 APIMart 文档减少 audio_urls 数量。";
+  if (audioUrls.length && !imageUrls.length && !videoUrls.length) {
+    return "参考音频不能单独使用，请同时提供参考图片或参考视频。";
+  }
+
+  const invalidVideo = videoUrls.find((url) => !isSupportedReferenceUrl(url, "video"));
+  if (invalidVideo) {
+    return `参考视频 URL 格式不符合文档要求：${invalidVideo}。请填写 APIMart 可直接访问的 http(s) 视频 URL 或 asset:// 资源。`;
+  }
+
+  const invalidAudio = audioUrls.find((url) => !isSupportedReferenceUrl(url, "audio"));
+  if (invalidAudio) {
+    return `参考音频 URL 格式不符合文档要求：${invalidAudio}。请填写 APIMart 可直接访问的 http(s) 音频 URL 或 asset:// 资源。`;
+  }
+
+  return "";
+}
+
+function isSupportedReferenceUrl(value, kind) {
+  const url = String(value || "").trim();
+  if (/^asset:\/\/[\w./:-]+$/i.test(url)) return true;
+  if (!/^https?:\/\//i.test(url)) return false;
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) return false;
+    const pathname = parsed.pathname.toLowerCase();
+    if (!pathname.includes(".")) return true;
+    const videoExts = [".mp4", ".mov", ".webm", ".m4v"];
+    const audioExts = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"];
+    const allowed = kind === "video" ? videoExts : audioExts;
+    return allowed.some((ext) => pathname.endsWith(ext));
+  } catch {
+    return false;
+  }
 }
 
 function toBoolean(value) {
