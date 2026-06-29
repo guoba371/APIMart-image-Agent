@@ -21,7 +21,7 @@ const mimeTypes = {
   ".ogg": "audio/ogg",
 };
 
-const videoModels = ["doubao-seedance-2.0", "wan2.5"];
+const videoModels = ["doubao-seedance-2.0", "wan2.5", "grok-imagine-1.5", "Omni-Flash-Ext"];
 const videoModelCapabilities = {
   "doubao-seedance-2.0": {
     imageUrls: true,
@@ -39,6 +39,29 @@ const videoModelCapabilities = {
     generateAudio: false,
     returnLastFrame: false,
   },
+  "grok-imagine-1.5": {
+    imageUrls: true,
+    frames: false,
+    referenceVideo: false,
+    referenceAudio: false,
+    generateAudio: false,
+    returnLastFrame: false,
+  },
+  "Omni-Flash-Ext": {
+    imageUrls: true,
+    frames: false,
+    referenceVideo: true,
+    referenceAudio: false,
+    generateAudio: false,
+    returnLastFrame: false,
+  },
+};
+
+const apimartVideoModelMap = {
+  "doubao-seedance-2.0": "doubao-seedance-2.0",
+  "wan2.5": "wan2.5-preview",
+  "grok-imagine-1.5": "grok-imagine-1.5-video-apimart",
+  "Omni-Flash-Ext": "Omni-Flash-Ext",
 };
 
 export function createConfig(env = {}) {
@@ -269,14 +292,26 @@ async function handleVideoGenerate(request, config, body) {
     return jsonResponse(400, { error: capabilityError });
   }
 
-  const capabilities = videoModelCapabilities[modelResult.model];
-  const payload = {
-    model: modelResult.model,
+  const modelRequestError = validateVideoModelRequest(modelResult.model, {
     prompt,
-    duration: clampInt(body.duration, 4, 15, 5),
-    size: body.size || "16:9",
-    resolution: body.resolution || "720p",
-  };
+    videoType: String(body.videoType || "text").trim(),
+    size: String(body.size || "").trim(),
+    resolution: String(body.resolution || "").trim(),
+    duration: Number(body.duration),
+    imageUrls,
+    videoUrls,
+  });
+  if (modelRequestError) {
+    return jsonResponse(400, { error: modelRequestError });
+  }
+
+  const capabilities = videoModelCapabilities[modelResult.model];
+  const upstreamModel = apimartVideoModelMap[modelResult.model] || modelResult.model;
+  const payload = buildVideoPayload(modelResult.model, upstreamModel, body, {
+    prompt,
+    imageUrls,
+    videoUrls,
+  });
 
   if (capabilities.generateAudio) payload.generate_audio = toBoolean(body.generateAudio);
   if (capabilities.returnLastFrame) payload.return_last_frame = toBoolean(body.returnLastFrame);
@@ -289,11 +324,14 @@ async function handleVideoGenerate(request, config, body) {
     if (firstFrameUrl) payload.image_with_roles.push({ url: firstFrameUrl, role: "first_frame" });
     if (lastFrameUrl) payload.image_with_roles.push({ url: lastFrameUrl, role: "last_frame" });
   } else if (capabilities.imageUrls && imageUrls.length) {
-    payload.image_urls = imageUrls.slice(0, 9);
+    payload.image_urls = getVideoModelImageUrls(modelResult.model, imageUrls);
+    if (modelResult.model === "Omni-Flash-Ext" && payload.image_urls.length === 3) {
+      payload.generation_type = "reference";
+    }
   }
 
   if (!hasFrameInput) {
-    if (capabilities.referenceVideo && videoUrls.length) payload.video_urls = videoUrls.slice(0, 3);
+    if (capabilities.referenceVideo && videoUrls.length) payload.video_urls = getVideoModelVideoUrls(modelResult.model, videoUrls);
     if (capabilities.referenceAudio && audioUrls.length) payload.audio_urls = audioUrls.slice(0, 3);
   }
 
@@ -733,7 +771,51 @@ function validateVideoModelCapabilities(model, input) {
 function getVideoModelLabel(model) {
   if (model === "doubao-seedance-2.0") return "Seedance 2.0";
   if (model === "wan2.5") return "Wan 2.5";
+  if (model === "grok-imagine-1.5") return "Grok Imagine 1.5";
+  if (model === "Omni-Flash-Ext") return "Omni-Flash-Ext";
   return model;
+}
+
+function buildVideoPayload(model, upstreamModel, body, input) {
+  const size = String(body.size || "16:9").trim() || "16:9";
+  const resolution = String(body.resolution || "720p").trim() || "720p";
+  const payload = {
+    model: upstreamModel,
+    prompt: input.prompt,
+  };
+
+  if (model === "grok-imagine-1.5") {
+    payload.duration = clampInt(body.duration, 6, 30, 6);
+    payload.size = size;
+    payload.quality = ["480p", "720p"].includes(resolution) ? resolution : "720p";
+    return payload;
+  }
+
+  if (model === "Omni-Flash-Ext") {
+    if (!input.videoUrls.length) payload.duration = Number(body.duration);
+    payload.resolution = resolution.toLowerCase();
+    payload.aspect_ratio = size === "adaptive" ? "16:9" : size;
+    return payload;
+  }
+
+  payload.duration = model === "wan2.5"
+    ? normalizeWanDuration(body.duration)
+    : clampInt(body.duration, 4, 15, 5);
+  payload.resolution = resolution;
+  if (model !== "wan2.5") payload.size = size;
+  return payload;
+}
+
+function getVideoModelImageUrls(model, imageUrls) {
+  if (model === "wan2.5") return imageUrls.slice(0, 1);
+  if (model === "grok-imagine-1.5") return imageUrls.slice(0, 7);
+  if (model === "Omni-Flash-Ext") return imageUrls.slice(0, 3);
+  return imageUrls.slice(0, 9);
+}
+
+function getVideoModelVideoUrls(model, videoUrls) {
+  if (model === "Omni-Flash-Ext") return videoUrls.slice(0, 1);
+  return videoUrls.slice(0, 3);
 }
 
 function validateReferenceMedia({ imageUrls, videoUrls, audioUrls }) {
@@ -754,6 +836,69 @@ function validateReferenceMedia({ imageUrls, videoUrls, audioUrls }) {
   }
 
   return "";
+}
+
+function validateVideoModelRequest(model, input) {
+  if (model === "wan2.5") {
+    if (input.imageUrls.length > 1) {
+      return "Wan 2.5 图生视频按文档只支持 1 张参考图，请只保留一个 image_urls。";
+    }
+    if (input.videoType === "image" && !input.imageUrls.length) {
+      return "Wan 2.5 图生视频需要提供 1 张参考图。";
+    }
+    if (![5, 10].includes(Number(input.duration))) {
+      return "Wan 2.5 按文档只支持 5 秒或 10 秒，请调整 duration。";
+    }
+    if (input.size === "adaptive") {
+      return "Wan 2.5 不支持 adaptive 比例，请改成 16:9、9:16、1:1、4:3、3:4 或 21:9。";
+    }
+  }
+
+  if (model === "grok-imagine-1.5") {
+    if (!input.prompt) {
+      return "Grok Imagine 1.5 按文档需要提供 prompt。";
+    }
+    const duration = Number(input.duration);
+    if (!Number.isInteger(duration) || duration < 6 || duration > 30) {
+      return "Grok Imagine 1.5 按文档只支持 6-30 秒整数时长，请调整 duration。";
+    }
+    if (!["16:9", "9:16", "1:1", "3:2", "2:3"].includes(input.size || "16:9")) {
+      return "Grok Imagine 1.5 按文档只支持 16:9、9:16、1:1、3:2 或 2:3 比例。";
+    }
+    if (!["480p", "720p"].includes(input.resolution || "720p")) {
+      return "Grok Imagine 1.5 按文档只支持 480p 或 720p quality。";
+    }
+    if (input.imageUrls.length > 7) {
+      return "Grok Imagine 1.5 图生视频按文档最多支持 7 张参考图，请减少 image_urls。";
+    }
+  }
+
+  if (model === "Omni-Flash-Ext") {
+    if (!input.prompt) {
+      return "Omni-Flash-Ext 按文档需要提供 prompt。";
+    }
+    if (!input.videoUrls.length && ![4, 6, 8, 10].includes(Number(input.duration))) {
+      return "Omni-Flash-Ext 按文档只支持 4、6、8 或 10 秒；参考视频模式不需要 duration。";
+    }
+    if (!["720p", "1080p", "4k"].includes(String(input.resolution || "720p").toLowerCase())) {
+      return "Omni-Flash-Ext 按文档只支持 720p、1080p 或 4k 分辨率。";
+    }
+    if (![0, 1, 3].includes(input.imageUrls.length)) {
+      return "Omni-Flash-Ext 按文档只支持 0、1 或 3 张参考图，不支持 2 张图。";
+    }
+    if (input.videoUrls.length > 1) {
+      return "Omni-Flash-Ext 按文档最多支持 1 个参考视频。";
+    }
+    if (input.size === "adaptive") {
+      return "Omni-Flash-Ext 不建议使用 adaptive，请改成 16:9 或 9:16。";
+    }
+  }
+
+  return "";
+}
+
+function normalizeWanDuration(value) {
+  return Number(value) === 10 ? 10 : 5;
 }
 
 function isSupportedReferenceUrl(value, kind) {

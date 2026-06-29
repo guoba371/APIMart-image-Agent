@@ -22,6 +22,13 @@ You can also start it directly:
 node server.mjs
 ```
 
+On macOS, if direct access to APIMart times out but your local proxy is listening on
+`127.0.0.1:7897`, start with:
+
+```bash
+npm run dev:proxy
+```
+
 ## Config
 
 Create `.env` from `.env.example`:

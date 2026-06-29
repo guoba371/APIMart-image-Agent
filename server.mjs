@@ -23,7 +23,9 @@ if (existsSync(envPath)) {
 }
 
 const config = createConfig(process.env);
-installLocalApimartFetchFallback(config.apiUrl);
+if (process.platform === "win32") {
+  installLocalApimartFetchFallback(config.apiUrl);
+}
 
 const serveStatic = async (request) => {
   const url = new URL(request.url);
@@ -87,7 +89,7 @@ function installLocalApimartFetchFallback(apiUrl) {
       return await nativeFetch(resource, init);
     } catch (error) {
       if (!url || !String(url).startsWith(apiOrigin)) throw error;
-      console.warn(`Native fetch to APIMart failed, retrying through PowerShell: ${error.message}`);
+      console.warn(`Native fetch to APIMart failed on Windows, retrying through PowerShell: ${error.message}`);
       return powershellFetch(String(url), init);
     }
   };
