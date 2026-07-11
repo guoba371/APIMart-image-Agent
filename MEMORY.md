@@ -33,6 +33,7 @@
 - 2026-06-29 Cloudflare 登录授权恢复后部署成功：`npx wrangler deploy` 发布 `apimart-image-agent` 到 `https://apimart-image-agent.guoshanming1990-45d.workers.dev`，Version ID `5aeb6291-6189-4304-816a-0b19753e038a`。本机直连 workers.dev 会超时，需通过 `127.0.0.1:7897` 代理验证；代理验证 `/` 包含 Grok/Omni 新模型，`/api/config` 返回新模型列表。线上当前未配置 `APIMART_API_KEY` / `DEEPSEEK_API_KEY`，`/api/config` 显示 `hasApiKey:false`、`hasDeepSeekApiKey:false`。
 - 2026-06-29 用户要求改部署到 Cloudflare `1326156839@qq.com's Account`；重新 `npx wrangler login` 后账号为 `1326156839@qq.com`，Account ID `4cc840f10ba6df0ac1780e90159074d0`。`npx wrangler deploy` 发布成功：`https://apimart-image-agent.1326156839.workers.dev`，Version ID `bbc10202-d20a-4d53-a32b-87ef7a520e95`。代理验证 `/` 包含 Grok/Omni 新模型，`/api/config` 返回新模型列表，且 `hasApiKey:true`、`hasDeepSeekApiKey:false`。
 - 2026-07-11 图片生成新增 `nano-banana-pro`（上游映射 `gemini-3-pro-image-preview-official`）、`doubao-seedream-5-0-pro`、`gpt-image-2-official`；服务端按模型限制分辨率、生成张数和参考图数量。新增 `/api/audio/speech`，使用 `gpt-4o-mini-tts` 同步透传二进制音频，支持 6 种音色和 WAV/Opus/AAC/FLAC/PCM。
+- 2026-07-11 已将图片模型、TTS 和移动端模式切换优化推送到 GitHub `guoba371/APIMart-image-Agent` 的 `main`，提交 `7be830e`（基于 `376dc8c` 追加，保留历史）。Cloudflare 部署到 `https://apimart-image-agent.1326156839.workers.dev`，Version ID `f8739068-9261-4936-bd7f-b0e43072d492`；线上 `/api/config` 验证四个图片模型生效，`hasApiKey:true`、`hasDeepSeekApiKey:false`。
 
 ## 待确认
 
