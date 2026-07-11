@@ -687,6 +687,10 @@
         white-space: pre-line;
       }
 
+      #taskSubtitle {
+        overflow-wrap: anywhere;
+      }
+
       .progress-wrap {
         width: 220px;
         height: 7px;
@@ -718,6 +722,7 @@
         text-align: center;
         line-height: 1.8;
         white-space: pre-line;
+        overflow-wrap: anywhere;
       }
 
       .image-grid {
@@ -2781,19 +2786,19 @@
         setBusy(false);
         clearPolling();
         const violations = error.details?.safetyViolations || [];
-        const isSexualSafety = violations.includes("sexual") || /sexual|安全系统|拦截/i.test(error.message);
+        const isSafetyError = violations.length > 0 || /sexual|敏感|安全系统|安全审核|拦截/i.test(error.message);
         taskTitle.textContent = "请求未完成";
-        taskSubtitle.textContent = error.message;
+        taskSubtitle.textContent = isSafetyError ? "生成内容触发上游安全审核，请调整提示词后重试。" : "请求失败，详细原因见下方。";
         empty.hidden = false;
         empty.classList.add("error");
         empty.textContent = error.message;
         appendLog(error.message);
         if (error.details?.requestId) appendLog(`Request ID: ${error.details.requestId}`);
         if (error.details?.traceId) appendLog(`Trace ID: ${error.details.traceId}`);
-        if (isSexualSafety) {
+        if (isSafetyError) {
           editedPrompt.value = buildStrictSafePrompt(promptEl.value);
           analyzeCurrentPrompt(editedPrompt.value);
-          appendLog("检测到 sexual 安全拦截，已在“调试结果”生成强力过审版本。点击“使用调试结果”后可重试。");
+          appendLog("检测到安全审核拦截，已在“调试结果”生成降敏版本。点击“使用调试结果”后可重试。");
         }
       }
 

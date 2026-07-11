@@ -50,6 +50,21 @@ test("TTS proxies binary audio with validated parameters", async () => {
   });
 });
 
+test("image output safety errors are converted to an actionable Chinese message", async () => {
+  await withFetch(async () => json({
+    error: {
+      message: 'all channels failed. Last error: HTTP 400: {"error":{"code":"OutputImageSensitiveContentDetected","message":"The request failed because the output image may contain sensitive information. Request id: 02178376375443665da4203214fbe81b3e8151fb2922fb15be564"}}',
+    },
+  }, 400), async () => {
+    const response = await generate({ model: "gpt-image-2", prompt: "test" });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.match(body.error, /生成结果被上游安全审核拦截/);
+    assert.doesNotMatch(body.error, /all channels failed/);
+    assert.equal(body.requestId, "02178376375443665da4203214fbe81b3e8151fb2922fb15be564");
+  });
+});
+
 function generate(body) {
   return handleRequest(new Request("http://local/api/generate", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -60,8 +75,8 @@ function env() {
   return { APIMART_API_KEY: "test-key", APIMART_API_URL: "https://api.example.test" };
 }
 
-function json(body) {
-  return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
 async function withFetch(mock, run) {

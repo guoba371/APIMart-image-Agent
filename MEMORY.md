@@ -34,6 +34,7 @@
 - 2026-06-29 用户要求改部署到 Cloudflare `1326156839@qq.com's Account`；重新 `npx wrangler login` 后账号为 `1326156839@qq.com`，Account ID `4cc840f10ba6df0ac1780e90159074d0`。`npx wrangler deploy` 发布成功：`https://apimart-image-agent.1326156839.workers.dev`，Version ID `bbc10202-d20a-4d53-a32b-87ef7a520e95`。代理验证 `/` 包含 Grok/Omni 新模型，`/api/config` 返回新模型列表，且 `hasApiKey:true`、`hasDeepSeekApiKey:false`。
 - 2026-07-11 图片生成新增 `nano-banana-pro`（上游映射 `gemini-3-pro-image-preview-official`）、`doubao-seedream-5-0-pro`、`gpt-image-2-official`；服务端按模型限制分辨率、生成张数和参考图数量。新增 `/api/audio/speech`，使用 `gpt-4o-mini-tts` 同步透传二进制音频，支持 6 种音色和 WAV/Opus/AAC/FLAC/PCM。
 - 2026-07-11 已将图片模型、TTS 和移动端模式切换优化推送到 GitHub `guoba371/APIMart-image-Agent` 的 `main`，提交 `7be830e`（基于 `376dc8c` 追加，保留历史）。Cloudflare 部署到 `https://apimart-image-agent.1326156839.workers.dev`，Version ID `f8739068-9261-4936-bd7f-b0e43072d492`；线上 `/api/config` 验证四个图片模型生效，`hasApiKey:true`、`hasDeepSeekApiKey:false`。
+- 2026-07-11 APIMart 图片任务可能返回嵌套错误 `OutputImageSensitiveContentDetected`，含义是生成结果被上游安全审核拦截，不一定是提示词本身违规；服务端已将其归一化为中文可操作提示并提取 Request ID，前端不再重复展示原始 JSON，同时自动生成降敏提示词。
 
 ## 待确认
 

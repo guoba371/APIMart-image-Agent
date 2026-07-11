@@ -736,9 +736,13 @@ function normalizeApimartError(status, data) {
   const message = upstream.message || data?.message || JSON.stringify(data).slice(0, 500);
   const safetyViolations = [...message.matchAll(/safety_violations=\[([^\]]+)\]/g)]
     .flatMap((match) => match[1].split(",").map((item) => item.trim()).filter(Boolean));
-  const requestId = message.match(/request ID ([0-9a-f-]+)/i)?.[1] || null;
+  const requestId = message.match(/request[ _]id:\s*([0-9a-z-]+)/i)?.[1]
+    || message.match(/request ID ([0-9a-z-]+)/i)?.[1]
+    || null;
   const traceId = message.match(/traceid:\s*([a-z0-9]+)/i)?.[1] || null;
-  const isSafetyRejection = message.toLowerCase().includes("safety system") || safetyViolations.length > 0;
+  const isSensitiveOutput = /OutputImageSensitiveContentDetected|output image may contain sensitive information/i.test(message)
+    || upstream.code === "OutputImageSensitiveContentDetected";
+  const isSafetyRejection = message.toLowerCase().includes("safety system") || safetyViolations.length > 0 || isSensitiveOutput;
 
   const error = new Error(`APIMart request failed (${status}): ${message}`);
   error.statusCode = isSafetyRejection ? 400 : status || 502;
@@ -749,18 +753,23 @@ function normalizeApimartError(status, data) {
   error.safetyViolations = safetyViolations;
   error.raw = data;
   error.userMessage = isSafetyRejection
-    ? buildSafetyMessage(safetyViolations, requestId, traceId)
+    ? buildSafetyMessage(safetyViolations, requestId, traceId, isSensitiveOutput)
     : `APIMart request failed (${status}): ${message}`;
   return error;
 }
 
-function buildSafetyMessage(violations, requestId, traceId) {
+function buildSafetyMessage(violations, requestId, traceId, isSensitiveOutput = false) {
   const labels = violations.length ? violations.join(", ") : "unknown";
-  const tips = [
-    "提示词被 APIMart / 上游模型安全系统拦截。",
-    `命中分类: ${labels}`,
-    "建议改写: 去掉露骨、性暗示、未成年人、裸露、身体挑逗、敏感姿势等描述，改成服装、场景、光线、构图、画风、镜头语言。",
-  ];
+  const tips = isSensitiveOutput
+    ? [
+      "生成结果被上游安全审核拦截，图片不会返回，也不会在页面展示。",
+      "这通常是模型生成结果触发审核，不一定代表你的提示词本身违规。请降低人物身体、年龄、裸露、暧昧姿势等描述强度，或更换构图后重试。",
+    ]
+    : [
+      "提示词被 APIMart / 上游模型安全系统拦截。",
+      `命中分类: ${labels}`,
+      "建议改写: 去掉露骨、性暗示、未成年人、裸露、身体挑逗、敏感姿势等描述，改成服装、场景、光线、构图、画风、镜头语言。",
+    ];
 
   if (requestId) tips.push(`Request ID: ${requestId}`);
   if (traceId) tips.push(`Trace ID: ${traceId}`);
