@@ -1,6 +1,6 @@
 # APIMart Image Agent
 
-Local web UI for generating images and videos through APIMart.
+Local web UI for generating images, videos, and TTS audio through APIMart.
 
 ## Local Start
 
@@ -85,10 +85,12 @@ This project supports Cloudflare Workers plus static assets from `public/`.
 
 ## APIMart Flow
 
-1. `POST /v1/images/generations` submits an image task.
+1. `POST /v1/images/generations` submits an image task. The UI supports GPT-Image-2, Nano banana Pro, Seedream-5.0-Pro, and the official GPT-Image-2 channel.
 2. The server reads `data[0].task_id`.
 3. `GET /v1/tasks/{task_id}` polls task status.
 4. When completed, the page displays image URLs from `data.result.images`.
+
+TTS uses `POST /v1/audio/speech` through the local `/api/audio/speech` proxy and returns the binary audio stream directly. Supported voices are Alloy, Echo, Fable, Onyx, Nova, and Shimmer; supported formats are WAV, Opus, AAC, FLAC, and PCM.
 
 Docs:
 

@@ -64,6 +64,22 @@ const apimartVideoModelMap = {
   "Omni-Flash-Ext": "Omni-Flash-Ext",
 };
 
+const imageModels = ["gpt-image-2", "nano-banana-pro", "doubao-seedream-5-0-pro", "gpt-image-2-official"];
+const imageModelCapabilities = {
+  "gpt-image-2": { maxImages: 4, maxReferences: 16, resolutions: ["1k", "2k", "4k"] },
+  "nano-banana-pro": { maxImages: 1, maxReferences: 14, resolutions: ["1K", "2K", "4K"] },
+  "doubao-seedream-5-0-pro": { maxImages: 1, maxReferences: 10, resolutions: ["1K", "2K"] },
+  "gpt-image-2-official": { maxImages: 4, maxReferences: 16, resolutions: ["1k", "2k", "4k"] },
+};
+const apimartImageModelMap = {
+  "gpt-image-2": "gpt-image-2",
+  "nano-banana-pro": "gemini-3-pro-image-preview-official",
+  "doubao-seedream-5-0-pro": "doubao-seedream-5-0-pro",
+  "gpt-image-2-official": "gpt-image-2-official",
+};
+const ttsVoices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+const ttsFormats = ["wav", "opus", "aac", "flac", "pcm"];
+
 export function createConfig(env = {}) {
   return {
     apiKey: String(env.APIMART_API_KEY || "").trim(),
@@ -86,6 +102,8 @@ export async function handleRequest(request, env = {}, options = {}) {
       return jsonResponse(200, {
         apiUrl: config.apiUrl,
         model: config.model,
+        imageModels,
+        imageModelCapabilities,
         videoModel: config.videoModel,
         videoModels,
         videoModelCapabilities,
@@ -115,6 +133,11 @@ export async function handleRequest(request, env = {}, options = {}) {
     if (request.method === "POST" && url.pathname === "/api/videos/generate") {
       const body = await readJsonRequest(request);
       return await handleVideoGenerate(request, config, body);
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/audio/speech") {
+      const body = await readJsonRequest(request);
+      return await handleTextToSpeech(request, config, body);
     }
 
     if (request.method === "POST" && url.pathname === "/api/prompts/generate") {
@@ -211,17 +234,30 @@ async function handleGenerate(request, config, body) {
     return jsonResponse(400, { error: "Prompt is required" });
   }
 
+  const requestedModel = String(body.model || config.model || "gpt-image-2").trim();
+  if (!imageModels.includes(requestedModel)) {
+    return jsonResponse(400, { error: `Unsupported image model: ${requestedModel}. Supported models: ${imageModels.join(", ")}` });
+  }
+  const capabilities = imageModelCapabilities[requestedModel];
+  const resolution = normalizeImageResolution(body.resolution, capabilities.resolutions);
+  if (!resolution) {
+    return jsonResponse(400, { error: `${requestedModel} supports resolutions: ${capabilities.resolutions.join(", ")}` });
+  }
+  const referenceImages = normalizeStringArray(body.referenceImages || body.imageUrls);
+  if (referenceImages.length > capabilities.maxReferences) {
+    return jsonResponse(400, { error: `${requestedModel} supports at most ${capabilities.maxReferences} reference images.` });
+  }
+
   const payload = {
-    model: config.model,
+    model: apimartImageModelMap[requestedModel],
     prompt,
-    n: clampInt(body.n, 1, 4, 1),
+    n: clampInt(body.n, 1, capabilities.maxImages, 1),
     size: body.size || "16:9",
-    resolution: body.resolution || "2k",
+    resolution,
   };
 
-  const referenceImages = normalizeStringArray(body.referenceImages || body.imageUrls);
   if (referenceImages.length) {
-    payload.image_urls = referenceImages.slice(0, 16);
+    payload.image_urls = referenceImages;
   }
 
   const maskUrl = String(body.maskUrl || "").trim();
@@ -244,6 +280,29 @@ async function handleGenerate(request, config, body) {
   }
 
   return jsonResponse(200, { taskId, submitted: data });
+}
+
+async function handleTextToSpeech(request, config, body) {
+  const apiKey = getRequestApiKey(request, config);
+  if (!apiKey) return jsonResponse(400, { error: "Please enter an APIMart API Key before submitting." });
+
+  const input = String(body.input || "").trim();
+  if (!input) return jsonResponse(400, { error: "Text is required" });
+  if (input.length > 4096) return jsonResponse(400, { error: "Text must not exceed 4096 characters." });
+  const voice = String(body.voice || "alloy");
+  const format = String(body.responseFormat || body.response_format || "wav");
+  const speed = Number(body.speed ?? 1);
+  if (!ttsVoices.includes(voice)) return jsonResponse(400, { error: `Unsupported voice: ${voice}` });
+  if (!ttsFormats.includes(format)) return jsonResponse(400, { error: `Unsupported audio format: ${format}` });
+  if (!Number.isFinite(speed) || speed < 0.25 || speed > 4) return jsonResponse(400, { error: "Speed must be between 0.25 and 4.0." });
+
+  return callApimartBinary("/v1/audio/speech", apiKey, config, {
+    model: "gpt-4o-mini-tts",
+    input,
+    voice,
+    response_format: format,
+    speed,
+  }, format);
 }
 
 async function handleVideoGenerate(request, config, body) {
@@ -521,6 +580,37 @@ async function callApimart(path, apiKey, config, options = {}) {
   return data;
 }
 
+async function callApimartBinary(path, apiKey, config, payload, format) {
+  let response;
+  try {
+    response = await fetch(`${config.apiUrl}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    const wrapped = new Error(`APIMart network request failed: ${error.message || error}`);
+    wrapped.statusCode = 502;
+    wrapped.userMessage = `APIMart 网络请求失败：${error.message || error}`;
+    throw wrapped;
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    let data;
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: { message: text } }; }
+    throw normalizeApimartError(response.status, data);
+  }
+  const contentTypes = { wav: "audio/wav", opus: "audio/opus", aac: "audio/aac", flac: "audio/flac", pcm: "application/octet-stream" };
+  return new Response(response.body, {
+    status: 200,
+    headers: {
+      "Content-Type": response.headers.get("content-type") || contentTypes[format],
+      "Content-Disposition": `inline; filename=tts.${format}`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 async function callDeepSeek(config, payload) {
   let response;
   try {
@@ -734,6 +824,11 @@ function clampInt(value, min, max, fallback) {
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeImageResolution(value, supported) {
+  const requested = String(value || supported[Math.min(1, supported.length - 1)]).trim();
+  return supported.find((item) => item.toLowerCase() === requested.toLowerCase()) || null;
 }
 
 function normalizeStringArray(value) {

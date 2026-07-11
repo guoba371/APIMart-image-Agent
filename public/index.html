@@ -491,26 +491,39 @@
 
       .mode-switch {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
         margin-bottom: 18px;
         padding: 4px;
         border: 1px solid var(--line);
-        border-radius: 999px;
+        border-radius: 12px;
         background: var(--segmented-bg);
       }
 
       .mode-button {
+        min-width: 0;
+        min-height: 40px;
+        padding: 0 10px;
         border: 0;
+        border-radius: 8px;
         background: transparent;
         color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
       }
 
       .mode-button.active {
-        background: var(--surface-solid);
-        color: var(--ink);
+        background: var(--accent-soft);
+        color: var(--accent);
         font-weight: 700;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        box-shadow: inset 0 0 0 1px var(--accent-line), 0 2px 8px rgba(0, 109, 119, 0.08);
+      }
+
+      .mode-button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
 
       .mode-panel[hidden] {
@@ -880,7 +893,6 @@
       @media (max-width: 560px) {
         .grid,
         .agent-grid,
-        .mode-switch,
         .actions,
         .tool-row,
         .edit-controls,
@@ -889,6 +901,19 @@
           grid-template-columns: 1fr;
           flex-direction: column;
           align-items: stretch;
+        }
+
+        .mode-switch {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 2px;
+          padding: 3px;
+          border-radius: 10px;
+        }
+
+        .mode-button {
+          min-height: 44px;
+          padding: 0 4px;
+          font-size: 13px;
         }
 
         .key-input-row,
@@ -961,6 +986,7 @@
           <div class="mode-switch" role="tablist" aria-label="生成类型">
             <button id="imageModeButton" class="mode-button active" type="button" aria-pressed="true">出图</button>
             <button id="videoModeButton" class="mode-button" type="button" aria-pressed="false">出视频</button>
+            <button id="audioModeButton" class="mode-button" type="button" aria-pressed="false">配音</button>
             <button id="agentModeButton" class="mode-button" type="button" aria-pressed="false">提示词</button>
           </div>
 
@@ -969,6 +995,15 @@
             <textarea id="prompt" name="prompt" required>9:16 vertical editorial portrait, single adult Korean woman in her mid-20s, soft black mist filter, subtle haze, gentle highlight bloom, muted tones, minimal indoor space, clean background, modest fashion styling, relaxed unposed composition, soft side light, fine grain, realistic look</textarea>
 
             <div class="grid">
+              <div>
+                <label for="imageModel">图片模型</label>
+                <select id="imageModel" name="model">
+                  <option value="gpt-image-2" selected>GPT-Image-2</option>
+                  <option value="nano-banana-pro">Nano banana Pro</option>
+                  <option value="doubao-seedream-5-0-pro">Seedream-5.0-Pro</option>
+                  <option value="gpt-image-2-official">GPT-Image-2 官方渠道</option>
+                </select>
+              </div>
               <div>
                 <label for="size">比例</label>
                 <select id="size" name="size">
@@ -1021,6 +1056,18 @@
               <button id="submitButton" class="primary" type="submit">生成图片</button>
               <button id="resetButton" class="ghost" type="button">清空</button>
             </div>
+          </form>
+
+          <form id="audioForm" class="mode-panel" hidden>
+            <label for="ttsInput">配音文本</label>
+            <textarea id="ttsInput" name="input" maxlength="4096" required placeholder="输入要转换为语音的文字，最多 4096 字符"></textarea>
+            <div class="grid">
+              <div><label for="ttsVoice">音色</label><select id="ttsVoice" name="voice"><option value="alloy">Alloy · 中性平衡</option><option value="echo">Echo · 男声沉稳</option><option value="fable">Fable · 英式叙述</option><option value="onyx">Onyx · 男声深沉</option><option value="nova" selected>Nova · 女声活力</option><option value="shimmer">Shimmer · 女声温柔</option></select></div>
+              <div><label for="ttsFormat">格式</label><select id="ttsFormat" name="responseFormat"><option value="wav" selected>WAV</option><option value="opus">Opus</option><option value="aac">AAC</option><option value="flac">FLAC</option><option value="pcm">PCM</option></select></div>
+              <div><label for="ttsSpeed">语速</label><input id="ttsSpeed" name="speed" type="number" min="0.25" max="4" step="0.05" value="1" /></div>
+            </div>
+            <div class="actions"><button id="audioSubmitButton" class="primary" type="submit">生成语音</button><button id="audioResetButton" class="ghost" type="reset">清空</button></div>
+            <div id="audioResult" style="margin-top: 18px" hidden><audio id="audioPlayer" controls style="width: 100%"></audio><div class="actions"><a id="audioDownload" class="primary" download>下载音频</a></div></div>
           </form>
 
           <form id="videoForm" class="mode-panel" hidden>
@@ -1388,9 +1435,11 @@
     <script>
       const form = document.querySelector("#form");
       const videoForm = document.querySelector("#videoForm");
+      const audioForm = document.querySelector("#audioForm");
       const promptAgentForm = document.querySelector("#promptAgentForm");
       const imageModeButton = document.querySelector("#imageModeButton");
       const videoModeButton = document.querySelector("#videoModeButton");
+      const audioModeButton = document.querySelector("#audioModeButton");
       const agentModeButton = document.querySelector("#agentModeButton");
       const themeToggleButton = document.querySelector("#themeToggleButton");
       const apiKeyInput = document.querySelector("#apiKeyInput");
@@ -1402,6 +1451,12 @@
       const balanceResult = document.querySelector("#balanceResult");
       const promptEl = document.querySelector("#prompt");
       const imageCountSelect = document.querySelector("#n");
+      const imageModel = document.querySelector("#imageModel");
+      const imageResolution = document.querySelector("#resolution");
+      const audioSubmitButton = document.querySelector("#audioSubmitButton");
+      const audioResult = document.querySelector("#audioResult");
+      const audioPlayer = document.querySelector("#audioPlayer");
+      const audioDownload = document.querySelector("#audioDownload");
       const videoPrompt = document.querySelector("#videoPrompt");
       const videoModel = document.querySelector("#videoModel");
       const videoType = document.querySelector("#videoType");
@@ -1482,6 +1537,14 @@
       let pollTimer = null;
       let selectedReferenceUrls = [];
       let currentMode = "image";
+      let audioObjectUrl = "";
+
+      const imageModelCapabilities = {
+        "gpt-image-2": { maxImages: 4, resolutions: ["1k", "2k", "4k"] },
+        "nano-banana-pro": { maxImages: 1, resolutions: ["1k", "2k", "4k"] },
+        "doubao-seedream-5-0-pro": { maxImages: 1, resolutions: ["1k", "2k"] },
+        "gpt-image-2-official": { maxImages: 4, resolutions: ["1k", "2k", "4k"] },
+      };
 
       const videoModelCapabilities = {
         "doubao-seedance-2.0": {
@@ -1651,6 +1714,10 @@
         try {
           const config = await api("/api/config");
           modelName.textContent = config.model;
+          if (config.model && [...imageModel.options].some((option) => option.value === config.model)) {
+            imageModel.value = config.model;
+            updateImageModelCapabilities();
+          }
           if (config.videoModel && [...videoModel.options].some((option) => option.value === config.videoModel)) {
             videoModel.value = config.videoModel;
             updateVideoModelCapabilities();
@@ -1692,8 +1759,10 @@
 
       promptEl.addEventListener("input", analyzeCurrentPrompt);
       imageCountSelect.addEventListener("change", updateImageSubmitText);
+      imageModel.addEventListener("change", updateImageModelCapabilities);
       imageModeButton.addEventListener("click", () => setMode("image"));
       videoModeButton.addEventListener("click", () => setMode("video"));
+      audioModeButton.addEventListener("click", () => setMode("audio"));
       agentModeButton.addEventListener("click", () => {
         window.location.href = "/prompts.html";
       });
@@ -1740,6 +1809,7 @@
       });
       updateVideoInputs();
       updateVideoModelCapabilities();
+      updateImageModelCapabilities();
       applyVideoDraftFromPromptPage();
       if (window.location.hash === "#video") {
         setMode("video");
@@ -1797,6 +1867,7 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              model: data.model,
               prompt,
               size: data.size,
               resolution: data.resolution,
@@ -1912,6 +1983,7 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              model: data.model,
               prompt: data.prompt,
               size: data.size,
               resolution: data.resolution,
@@ -1926,6 +1998,34 @@
         } catch (error) {
           showError(error);
         }
+      });
+
+      audioForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(audioForm).entries());
+        audioSubmitButton.disabled = true;
+        audioSubmitButton.textContent = "生成中...";
+        appendLog("正在生成语音...");
+        try {
+          const headers = { "Content-Type": "application/json" };
+          const apiKey = getApiKey();
+          if (apiKey) headers["X-APIMart-API-Key"] = apiKey;
+          const response = await fetch("/api/audio/speech", { method: "POST", headers, body: JSON.stringify(data) });
+          if (!response.ok) {
+            const details = await parseJsonResponse(response, "/api/audio/speech");
+            const error = new Error(details.error || "语音生成失败");
+            error.details = details;
+            throw error;
+          }
+          if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
+          audioObjectUrl = URL.createObjectURL(await response.blob());
+          audioPlayer.src = audioObjectUrl;
+          audioDownload.href = audioObjectUrl;
+          audioDownload.download = `tts.${data.responseFormat}`;
+          audioResult.hidden = false;
+          appendLog("语音生成完成。");
+        } catch (error) { showError(error); }
+        finally { audioSubmitButton.disabled = false; audioSubmitButton.textContent = "生成语音"; }
       });
 
       resetButton.addEventListener("click", () => {
@@ -1945,23 +2045,39 @@
         currentMode = mode;
         const isImage = mode === "image";
         const isVideo = mode === "video";
+        const isAudio = mode === "audio";
         const isAgent = mode === "agent";
         form.hidden = !isImage;
         videoForm.hidden = !isVideo;
+        audioForm.hidden = !isAudio;
         promptAgentForm.hidden = !isAgent;
         promptTools.hidden = !isImage;
         imageModeButton.classList.toggle("active", isImage);
         videoModeButton.classList.toggle("active", isVideo);
+        audioModeButton.classList.toggle("active", isAudio);
         agentModeButton.classList.toggle("active", isAgent);
         imageModeButton.setAttribute("aria-pressed", isImage ? "true" : "false");
         videoModeButton.setAttribute("aria-pressed", isVideo ? "true" : "false");
+        audioModeButton.setAttribute("aria-pressed", isAudio ? "true" : "false");
         agentModeButton.setAttribute("aria-pressed", isAgent ? "true" : "false");
-        taskTitle.textContent = isImage ? "等待输入" : isVideo ? "等待视频输入" : "等待提示词生成";
+        taskTitle.textContent = isImage ? "等待输入" : isVideo ? "等待视频输入" : isAudio ? "等待配音文本" : "等待提示词生成";
         taskSubtitle.textContent = isImage
           ? "还没有提交任务。"
           : isVideo
             ? "选择文生视频、图生视频、首尾帧或参考音视频后提交。"
+            : isAudio
+              ? "输入文字并选择音色、格式和语速。"
             : "填写营销信息后生成 Seedance 2.0 视频提示词，不会调用接口。";
+      }
+
+      function updateImageModelCapabilities() {
+        const capabilities = imageModelCapabilities[imageModel.value] || imageModelCapabilities["gpt-image-2"];
+        for (const option of imageCountSelect.options) option.disabled = Number(option.value) > capabilities.maxImages;
+        if (Number(imageCountSelect.value) > capabilities.maxImages) imageCountSelect.value = String(capabilities.maxImages);
+        for (const option of imageResolution.options) option.disabled = !capabilities.resolutions.includes(option.value);
+        if (imageResolution.selectedOptions[0]?.disabled) imageResolution.value = "2k";
+        modelName.textContent = imageModel.options[imageModel.selectedIndex]?.textContent || imageModel.value;
+        updateImageSubmitText();
       }
 
       function updateVideoInputs() {
