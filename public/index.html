@@ -2362,7 +2362,7 @@
 
         if (mode === "strict") {
           nextPrompt = buildStrictSafePrompt(source);
-          message = "已生成强力过审版本：高风险服装会改为无人模特商品目录，避免残留敏感词和中英混排。";
+          message = "已生成强力过审版本：保留服装设计语义，将高风险结构改由假人台、衣架和平铺特写表达。";
         }
 
         if (mode === "detail") {
@@ -2438,13 +2438,13 @@
 
         if (hasSensitiveApparel) {
           return [
-            "一组高端黑色纹理时装单品的商业商品展示拼图。",
-            "商品采用完整不透明面料，表面带有精细花卉纹理、波浪纹理和清晰缝线，整体结构端庄利落，适合精品服装目录展示。",
-            "画面采用九宫格布局：衣架正面、衣架背面、侧面轮廓、领口缝线、肩部结构、面料纹理微距、包装细节、礼盒陈列和精品店橱窗。",
-            "全程采用无人模特展示，不出现人物、人体、皮肤或穿着效果。",
-            "场景为整洁的高端服装摄影棚和精品店陈列区，包含深色木质展台、落地镜、丝绒礼盒和柔光灯饰。",
-            "整体使用金棕、酒红、黑色与象牙白配色，柔和暖光，真实材质，清晰商品细节，克制精致的轻奢时装目录风格。",
-            "professional product catalog photography, garment on hanger and display form, opaque textile, premium retail display, clean studio composition, realistic fabric texture, soft warm lighting, high detail",
+            "一组高端黑色蕾丝时装连体衣的商业商品展示拼图，重点忠实呈现原始服装设计。",
+            "商品采用完整不透明黑色内衬，外层覆盖精细花卉与波浪纹蕾丝；正面保留深 V 形视觉线条，但由不透明拼接面料完整承托；胸前下方保留菱形装饰区，使用同色半透明纹理层覆盖；背部保留开放式视觉结构和横向细带，并在内层加入同色不透明底布。领口、肩带、背部结构和腿口的扇形波浪蕾丝边缘清晰可见。",
+            "画面采用九宫格商品目录布局：衣架正面展示、假人台正面展示、假人台背面展示、V 形领口结构特写、菱形装饰区特写、背部细带结构特写、蕾丝纹理微距、服装平铺在酒红色丝绸织物上的俯拍，以及礼盒包装陈列。",
+            "仅使用无头无肢的专业服装展示假人台、衣架和平铺方式呈现商品结构，不出现真人穿着或身体姿态。丝绸织物只作为平铺摄影背景，用于保留柔软卧室织物的视觉氛围。",
+            "场景为高端服装摄影棚与精品店陈列区，包含落地镜、深色木质展台、酒红色丝绸织物、丝绒礼盒和柔光灯饰。",
+            "整体使用金棕、酒红与黑色配色，柔和暖光，真实材质，清晰商品细节，克制精致的轻奢时装目录风格。",
+            "professional apparel product catalog, black lace one-piece fashion garment with opaque lining, V-shaped front construction, diamond decorative panel, open-back-inspired layered construction, garment mannequin and flat-lay presentation, burgundy silk textile background, realistic fabric texture, soft warm studio lighting, high detail",
           ].join(" ");
         }
 

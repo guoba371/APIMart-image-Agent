@@ -35,7 +35,7 @@
 - 2026-07-11 图片生成新增 `nano-banana-pro`（上游映射 `gemini-3-pro-image-preview-official`）、`doubao-seedream-5-0-pro`、`gpt-image-2-official`；服务端按模型限制分辨率、生成张数和参考图数量。新增 `/api/audio/speech`，使用 `gpt-4o-mini-tts` 同步透传二进制音频，支持 6 种音色和 WAV/Opus/AAC/FLAC/PCM。
 - 2026-07-11 已将图片模型、TTS 和移动端模式切换优化推送到 GitHub `guoba371/APIMart-image-Agent` 的 `main`，提交 `7be830e`（基于 `376dc8c` 追加，保留历史）。Cloudflare 部署到 `https://apimart-image-agent.1326156839.workers.dev`，Version ID `f8739068-9261-4936-bd7f-b0e43072d492`；线上 `/api/config` 验证四个图片模型生效，`hasApiKey:true`、`hasDeepSeekApiKey:false`。
 - 2026-07-11 APIMart 图片任务可能返回嵌套错误 `OutputImageSensitiveContentDetected`，含义是生成结果被上游安全审核拦截，不一定是提示词本身违规；服务端已将其归一化为中文可操作提示并提取 Request ID，前端不再重复展示原始 JSON，同时自动生成降敏提示词。
-- 2026-07-12 “强力过审”不再逐词替换原提示词：检测到蕾丝/连体衣/深 V/镂空/露背/床/躺姿等高风险服装场景组合时，直接重建为无人模特的衣架/商品静物目录；普通人物提示词重建为成年模特、完整不透明成衣和站姿摄影棚目录。最终提示词避免 `no nudity` 等包含敏感概念的否定词和中英混排残片。
+- 2026-07-12 “强力过审”不再逐词替换原提示词：检测到蕾丝/连体衣/深 V/镂空/露背/床/躺姿等高风险服装场景组合时，保留蕾丝、V 形线条、菱形装饰区、开放式背部细带和丝绸织物等设计语义，但改用不透明内衬、无头无肢服装假人台、衣架与平铺特写表达；普通人物提示词重建为成年模特、完整不透明成衣和站姿摄影棚目录。最终提示词避免 `no nudity` 等包含敏感概念的否定词和中英混排残片。
 
 ## 待确认
 
