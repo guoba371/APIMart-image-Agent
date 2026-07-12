@@ -2362,7 +2362,7 @@
 
         if (mode === "strict") {
           nextPrompt = buildStrictSafePrompt(source);
-          message = "已生成强力过审版本：已移除敏感服装、坐地姿势和身体轮廓描述。";
+          message = "已生成强力过审版本：高风险服装会改为无人模特商品目录，避免残留敏感词和中英混排。";
         }
 
         if (mode === "detail") {
@@ -2433,46 +2433,29 @@
       }
 
       function buildStrictSafePrompt(text) {
-        let output = buildSafePrompt(text);
-        const strictReplacements = [
-          [/modest\s+camisole\s+layered\s+under\s+a\s+loose\s+shirt/gi, "modest ribbed knit top under an oversized shirt"],
-          [/\bcamisole\b/gi, "ribbed knit top"],
-          [/\bshorts?\b|\bskirt\b/gi, "tailored trousers"],
-          [/high-waisted\s+(tailored\s+)?trousers/gi, "tailored trousers"],
-          [/fitted\s+ribbed\s+knit\s+top/gi, "ribbed knit top with relaxed fit"],
-          [/modest\s+fitted\s+fabric\s+with\s+natural\s+texture/gi, "soft fabric with natural texture"],
-          [/modest\s+fitted\s+silhouette\s+with\s+natural\s+fabric\s+texture/gi, "soft fabric with natural texture"],
-          [/falls\s+naturally\s+on\s+the\s+silhouette/gi, "soft fabric texture"],
-          [/sitting\s+on\s+floor|one\s+leg\s+bent|other\s+relaxed/gi, "neutral standing pose"],
-          [/slightly\s+sensual|sensual|intimate/gi, "quiet editorial"],
-        ];
+        const source = String(text || "").trim();
+        const hasSensitiveApparel = /蕾丝|连体衣|内衣|深\s*v|镂空|露背|胸|腿口|吊带|床|卧室|躺|坐姿背部|lingerie|lace|bodysuit|deep\s*v|cutout|backless|bedroom|reclin/iu.test(source);
 
-        for (const [pattern, replacement] of strictReplacements) {
-          output = output.replace(pattern, replacement);
+        if (hasSensitiveApparel) {
+          return [
+            "一组高端黑色纹理时装单品的商业商品展示拼图。",
+            "商品采用完整不透明面料，表面带有精细花卉纹理、波浪纹理和清晰缝线，整体结构端庄利落，适合精品服装目录展示。",
+            "画面采用九宫格布局：衣架正面、衣架背面、侧面轮廓、领口缝线、肩部结构、面料纹理微距、包装细节、礼盒陈列和精品店橱窗。",
+            "全程采用无人模特展示，不出现人物、人体、皮肤或穿着效果。",
+            "场景为整洁的高端服装摄影棚和精品店陈列区，包含深色木质展台、落地镜、丝绒礼盒和柔光灯饰。",
+            "整体使用金棕、酒红、黑色与象牙白配色，柔和暖光，真实材质，清晰商品细节，克制精致的轻奢时装目录风格。",
+            "professional product catalog photography, garment on hanger and display form, opaque textile, premium retail display, clean studio composition, realistic fabric texture, soft warm lighting, high detail",
+          ].join(" ");
         }
 
-        const required = [
-          "adult Korean woman in her mid-20s",
-          "modest fashion editorial portrait",
-          "ribbed knit top under an oversized shirt",
-          "tailored trousers",
-          "neutral standing pose",
-          "clean indoor background",
-          "soft side light",
-          "calm natural expression",
-          "no erotic tone",
-          "no nudity",
-          "no minors",
-          "no revealing clothing",
-          "no body emphasis",
-        ];
-
-        output = appendUniquePhrases(output, required);
-        return output
-          .replace(/\s+/g, " ")
-          .replace(/,+/g, ",")
-          .replace(/\s,\s/g, ", ")
-          .trim();
+        return [
+          "一组高端成衣商业目录摄影，主体为一位明确成年的亚洲女性模特。",
+          "模特身穿完整不透明的宽松针织上衣、廓形衬衫和剪裁长裤，服装覆盖完整，版型自然。",
+          "模特采用自然站姿、正面站姿、侧面站姿和行走姿态，神态平静专业。",
+          "场景为简洁明亮的摄影棚与精品店陈列区，背景整洁，保留充足留白。",
+          "柔和侧光，真实面料纹理，克制的中性色彩，专业时尚商品目录构图。",
+          "commercial fashion catalog photography, adult model, opaque layered outfit, professional standing poses, clean studio background, soft side light, realistic textile detail",
+        ].join(" ");
       }
 
       function addPhotoDetails(text) {
